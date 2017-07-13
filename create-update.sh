@@ -3,11 +3,11 @@
 ZIP_PASSWORD=""
 #"-P password"
 
-UBOOT_VERSION=0533-001
+UBOOT_VERSION=0574-001
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=0533-001
+KERNEL_VERSION=0574-001
 ROOTFS_VERSION=1.0
-ROOTFSLIVE_VERSION=0533-001
+ROOTFSLIVE_VERSION=0574-001
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -25,15 +25,18 @@ APP_BINARIES=$HOME/binaries/app
 
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
-YOCTO_IMAGE=0533panelpcimx6q-$ROOTFS_VERSION
+YOCTO_IMAGE=0574-$ROOTFS_VERSION
 
 skippartitioning=1
 skipuboot=0
 skipspl=0
 skipkernel=0
 skiprootfs=0
+update_nand=0
+dt_version=0
 
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --help]" 1>&2; exit 1; }
+# ./create-update.sh --makepartition --nand --dt=AA01.01
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -44,7 +47,7 @@ error() {
 	echo " "	
 }
 
-TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,help -- "$@")
+TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,nand,dt:,help -- "$@")
 [ $? -eq 1 ] && exit
 
 eval set -- "$TEMP"
@@ -57,6 +60,8 @@ do
         --no-kernel ) skipkernel=1; shift;;
         --no-rootfs ) skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
+        --nand ) update_nand=1; shift;;
+        --dt ) dt_version=$2; shift 2;;
         --help )      usage; shift;;
 	    -- ) shift; break;;
 		* ) break;
@@ -130,7 +135,11 @@ if [ $skipkernel = 0 ]; then
 	
 	#update kernel
 	cd $KERNEL_BINARIES
-	tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
+	if [ $update_nand = 1 ]; then
+		tar czvf $OUTPUT/$KERNEL_PKG zImage *$dt_version.dtb
+	else
+		tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
+	fi
 	cd $HOME
 fi
 
@@ -140,8 +149,8 @@ if [ $skiprootfs = 0 ]; then
 	message "Adding rootfs"
 	#update rootfs
 	if [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi ]; then
-		#do nothing, ubi image doesn't require processing
-		ROOTFS_PKG=$ROOTFS_BINARIES/$YOCTO_IMAGE.ubi
+		ROOTFS_PKG=rootfs.ubi
+		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi $OUTPUT/$ROOTFS_PKG
 	elif [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 ]; then
 		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 $OUTPUT/$ROOTFS_PKG
 	fi
@@ -154,6 +163,11 @@ cd $OUTPUT
 #force make partition
 if [ $skippartitioning = 0 ]; then
 	sed -i 's/mkfs=0/mkfs=1/g' setup.sh
+fi
+
+if [ $update_nand = 1 ]; then
+	sed -i 's/type=emmc/type=nand/g' setup.sh
+	sed -i 's/dt_file=XX/dt_file=imx7d-egf-WID0575_'$dt_version'.dtb/g' setup.sh
 fi
 
 #build update file

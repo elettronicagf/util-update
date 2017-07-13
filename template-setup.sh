@@ -1,4 +1,4 @@
-
+set -x
 message() {
 	echo "##### $1 #####"
 }
@@ -39,13 +39,12 @@ installPackage() {
 }
 
 #must match the one used in create-update.sh
-ZIP_PASSWORD="password"
+ZIP_PASSWORD="" #format to set password "-P xxxx"
 source=$(dirname $0)
-#emmc | sdcard
+#emmc | sdcard | nand
 type=emmc
 mkfs=0
-mtd_spl=/dev/mtd0
-mtd_uboot=/dev/mtd1
+dt_file=XX
 
 if [ $type = emmc ]; then
 	message "Updating EMMC"
@@ -53,11 +52,23 @@ if [ $type = emmc ]; then
 elif [ $type = sdcard ]; then
 	message "Updating SDCARD"
 	dest_dev=mmcblk0
+elif [ $type = nand ]; then
+	message "Updating NAND"
 fi
 
-dest_boot_partition=/run/media/$dest_dev'p1'
-dest_rootfs_partition=/run/media/$dest_dev'p2'
-dest_app_partition=/run/media/$dest_dev'p2'
+if [ $type=nand ]; then
+	mtd_spl=/dev/mtd4
+	mtd_uboot=/dev/mtd5
+	dest_kernel_partition=/dev/mtd0
+	dest_dtb_partition=/dev/mtd1
+	dest_rootfs_partition=/dev/mtd2
+else
+	mtd_spl=/dev/mtd4
+	mtd_uboot=/dev/mtd5
+	dest_boot_partition=/run/media/$dest_dev'p1'
+	dest_rootfs_partition=/run/media/$dest_dev'p2'
+	dest_app_partition=/run/media/$dest_dev'p2'
+fi
 
 bootmedia=/run/media/mmcblk0p1
 [ ! -z "$(mount | grep sda)" ] && bootmedia=/run/media/sda
@@ -68,6 +79,7 @@ cd $source
 #show splash screen
 zcat update-splash.gz > /dev/fb0
 
+if [ $type!=nand ]; then
 #----------------------
 # partizionamento emmc:
 #Disk /dev/mmcblk2: , 3909091328 bytes
@@ -107,6 +119,7 @@ if [ $mkfs = 1 ]; then
 	udevadm trigger --action=add
 	udevadm settle --timeout=10
 fi
+fi #type!=nand
 
 #--------------
 # uboot
@@ -115,9 +128,9 @@ if [ -f $source/uboot.tar.gz ]; then
     message "Installing u-boot update -> $mtd_spl $mtd_uboot" 
     
     #rw nor
-    echo 90 > /sys/class/gpio/export
-    echo out > /sys/class/gpio/gpio90/direction
-    echo 1 > /sys/class/gpio/gpio90/value
+    echo 138 > /sys/class/gpio/export
+    echo out > /sys/class/gpio/gpio138/direction
+    echo 1 > /sys/class/gpio/gpio138/value
     
 	mkdir ./uboot
 	installPackage $source/uboot.tar.gz ./uboot
@@ -139,9 +152,38 @@ if [ -f $source/uboot.tar.gz ]; then
 	fi	
 	
 	#ro nor
-	echo 0 > /sys/class/gpio/gpio90/value
+	echo 0 > /sys/class/gpio/gpio138/value
 fi
 
+if [ $type=nand ]; then #update nand
+#--------------
+# kernel
+#--------------
+message "Installing kernel update -> $dest_boot_partition"
+
+#scompatto kernel e dt
+mkdir $source/kernel
+installPackage $source/kernel.tar.gz $source/kernel
+
+#scrivo kernel
+flash_erase /dev/mtd0 0 0
+nandwrite -p /dev/mtd0 kernel/zImage
+
+#scrivo dt
+flash_erase /dev/mtd1 0 0
+nandwrite -p /dev/mtd1 kernel/$dt_file
+
+
+#--------------
+# rootfs (bz2)
+#--------------
+if [ -f $bootmedia/update2.bin ]; then
+	message "Installing rootfs update -> $dest_rootfs_partition"
+	UBISIZE=$(unzip -l /run/media/sda1/update2.bin | grep rootfs.ubi | awk '{print $1}')
+	unzip -p $ZIP_PASSWORD $bootmedia/update2.bin | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
+fi
+
+else #update emmc/mmc
 #--------------
 # kernel
 #--------------
@@ -156,14 +198,9 @@ if [ -f $bootmedia/update2.bin ]; then
 	unzip -p -P $ZIP_PASSWORD $bootmedia/update2.bin | tar xjf - -C $dest_rootfs_partition
 fi
 
-#--------------
-# Application 
-#--------------
-if [ -f $bootmedia/update3.bin ]; then
-	message "Installing application update -> $dest_app_partition"
-	mkdir -p $dest_app_partition
-	unzip -p -P $ZIP_PASSWORD $bootmedia/update3.bin | tar xzf - -C $dest_app_partition
-fi
+umount /dev/$dest_dev'p'*
+
+fi #type!=nand
 
 cd /
 sync
@@ -172,7 +209,6 @@ sync
 umount /dev/sda
 umount /dev/sda1
 umount /dev/sda2
-umount /dev/$dest_dev'p'*
 
 #notify update is terminated
 zcat $source/update-terminated.gz > /dev/fb0
