@@ -68,6 +68,18 @@ do
     esac
 done
 
+if [ $update_nand = 1 ]; then
+	if [ $dt_version = 0 ]; then
+		error "Error: missing required parameter 'dt'"
+		exit
+	fi
+	
+	if [ $skippartitioning = 0 ]; then
+		error "Error: option 'makepartition' is incompatible with option 'nand'"
+		exit
+	fi
+fi	
+
 #create dirs
 rm -rf $DEST
 rm -rf $OUTPUT
@@ -106,7 +118,7 @@ if [ $skipuboot = 0 ]; then
 fi
 
 if [ $skipspl = 0 ]; then
-	message "Adding spl"
+	message "Adding SPL"
 	cp $UBOOT_BINARIES/SPL-$SPL_VERSION ./spl.img
 fi
 
@@ -128,9 +140,9 @@ if [ $skipkernel = 0 ]; then
 		sudo rm -rf $APP_BINARIES/home/root/modules
 		sudo mkdir -p $APP_BINARIES/home/root/modules
 		cd $APP_BINARIES/home/root/modules
-		sudo tar xvf $filename_modules .
+		sudo tar xf $filename_modules .
 		sudo chown -R root:root $APP_BINARIES/*
-		tar czvf $OUTPUT/$APP_PKG -C $APP_BINARIES .
+		tar czf $OUTPUT/$APP_PKG -C $APP_BINARIES .
 	fi
 	
 	#update kernel
@@ -197,9 +209,10 @@ rm -rf ./output
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
 echo -e '\E[1;33mVersions: '
-[ $skipuboot = 0 ]  && echo 'U-Boot ' $UBOOT_VERSION
-[ $skipspl = 0 ]    && echo 'SPL    ' $SPL_VERSION
-[ $skipkernel = 0 ] && echo 'Kernel ' $KERNEL_VERSION
-[ $skiprootfs = 0 ] && echo 'Rootfs ' $ROOTFS_VERSION
+[ $skipuboot = 0 ]   && echo 'U-Boot ' $UBOOT_VERSION
+[ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
+[ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
+[ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
+[ $update_nand = 1 ] && echo 'WID     WID0575_'$dt_version
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
