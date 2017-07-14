@@ -36,7 +36,7 @@ update_nand=0
 dt_version=0
 
 # ./create-update.sh --makepartition --nand --dt=AA01.01
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --help]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
