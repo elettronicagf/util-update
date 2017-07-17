@@ -1,13 +1,13 @@
 #!/bin/sh
 #set -x
-ZIP_PASSWORD=""
+ZIP_PASSWORD='8fX589i2ed_@YT#xx++]]00$aqe34=='
 #"-P password"
 
-UBOOT_VERSION=0533-001
+UBOOT_VERSION=0571-001
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=0533-001
+KERNEL_VERSION=0571-002
 ROOTFS_VERSION=1.0
-ROOTFSLIVE_VERSION=0533-001
+ROOTFSLIVE_VERSION=0571-001
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -25,15 +25,19 @@ APP_BINARIES=$HOME/binaries/app
 
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
-YOCTO_IMAGE=0533panelpcimx6q-$ROOTFS_VERSION
+YOCTO_IMAGE=0571consolesmart-$ROOTFS_VERSION
 
 skippartitioning=1
 skipuboot=0
 skipspl=0
 skipkernel=0
 skiprootfs=0
+update_nand=0
+dt_version=0
+cpu_type=0
 
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --help]" 1>&2; exit 1; }
+# ./create-update.sh --makepartition --nand --dt=AA01.01 --cpu=ul
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID | --cpu=[ul/ull] --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -44,7 +48,7 @@ error() {
 	echo " "	
 }
 
-TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,help -- "$@")
+TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,nand,dt:,cpu:,help -- "$@")
 [ $? -eq 1 ] && exit
 
 eval set -- "$TEMP"
@@ -52,21 +56,42 @@ eval set -- "$TEMP"
 while true
 do
     case "$1" in
-        --no-uboot )  skipuboot=1; shift;;
-        --no-spl )    skipspl=1; shift;;
-        --no-kernel ) skipkernel=1; shift;;
-        --no-rootfs ) skiprootfs=1; shift;;
+        --no-uboot )      skipuboot=1; shift;;
+        --no-spl )        skipspl=1; shift;;
+        --no-kernel )     skipkernel=1; shift;;
+        --no-rootfs )     skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
-        --help )      usage; shift;;
-	    -- ) shift; break;;
-		* ) break;
+        --nand )          update_nand=1; shift;;
+        --dt )            dt_version=$2; shift 2;;
+        --cpu )           cpu_type='mx6'$2; shift 2;;
+        --help )          usage; shift;;
+	    -- )              shift; break;;
+		* )               break;
     esac
 done
+
+if [ $update_nand = 1 ]; then
+	if [ $dt_version = 0 ]; then
+		error "Error: missing required parameter 'dt'"
+		exit
+	fi
+	
+	if [ $cpu_type = 0 ]; then
+		error "Error: missing required parameter 'cpu'"
+		exit
+	fi	
+	
+	if [ $skippartitioning = 0 ]; then
+		error "Error: option 'makepartition' is incompatible with option 'nand'"
+		exit
+	fi
+fi	
 
 #create dirs
 rm -rf $DEST
 rm -rf $OUTPUT
 rm -rf tmp
+sudo rm -rf $APP_BINARIES/*
 
 mkdir -p $DEST
 mkdir -p $OUTPUT
@@ -97,12 +122,12 @@ rm ./* 1>/dev/null 2>&1
 
 if [ $skipuboot = 0 ]; then
 	message "Adding u-boot"
-	cp $UBOOT_BINARIES/u-boot.img-$UBOOT_VERSION ./u-boot.img
+	cp $UBOOT_BINARIES/u-boot.img-$cpu_type-$UBOOT_VERSION ./u-boot.img
 fi
 
 if [ $skipspl = 0 ]; then
-	message "Adding spl"
-	cp $UBOOT_BINARIES/SPL-$SPL_VERSION ./spl.img
+	message "Adding SPL"
+	cp $UBOOT_BINARIES/SPL-$cpu_type-$SPL_VERSION ./spl.img
 fi
 
 if [[ $skipspl = 0 || $skipuboot = 0 ]]; then
@@ -118,19 +143,21 @@ if [ $skipkernel = 0 ]; then
     filename_modules=$KERNEL_BINARIES/$MODULES_FILE
     
 	if [ -e $filename_modules ]; then
-		message "Adding modules [/home/root/modules]"
+		message "Adding modules"
 		
-		sudo rm -rf $APP_BINARIES/home/root/modules
-		sudo mkdir -p $APP_BINARIES/home/root/modules
-		cd $APP_BINARIES/home/root/modules
-		sudo tar xvf $filename_modules .
+		cd $APP_BINARIES
+		sudo tar xf $filename_modules .
 		sudo chown -R root:root $APP_BINARIES/*
-		tar czvf $OUTPUT/$APP_PKG -C $APP_BINARIES .
+		tar czf $OUTPUT/$APP_PKG -C $APP_BINARIES .
 	fi
 	
 	#update kernel
 	cd $KERNEL_BINARIES
-	tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
+	if [ $update_nand = 1 ]; then
+		tar czvf $OUTPUT/$KERNEL_PKG zImage *$dt_version.dtb
+	else
+		tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
+	fi
 	cd $HOME
 fi
 
@@ -140,8 +167,8 @@ if [ $skiprootfs = 0 ]; then
 	message "Adding rootfs"
 	#update rootfs
 	if [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi ]; then
-		#do nothing, ubi image doesn't require processing
-		ROOTFS_PKG=$ROOTFS_BINARIES/$YOCTO_IMAGE.ubi
+		ROOTFS_PKG=rootfs.ubi
+		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi $OUTPUT/$ROOTFS_PKG
 	elif [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 ]; then
 		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 $OUTPUT/$ROOTFS_PKG
 	fi
@@ -156,15 +183,24 @@ if [ $skippartitioning = 0 ]; then
 	sed -i 's/mkfs=0/mkfs=1/g' setup.sh
 fi
 
+if [ $update_nand = 1 ]; then
+	sed -i 's/type=emmc/type=nand/g' setup.sh
+	sed -i 's/dt_file=XX/dt_file=imx6-egf-WID0571_'$dt_version'.dtb/g' setup.sh
+fi
+
+#update zip password
+sed -i 's/ZIP_PASSWORD=""/ZIP_PASSWORD='"'"$ZIP_PASSWORD"'"'/g' setup.sh
+cp setup.sh ../
+
 #build update file
 message "Packaging files"
-zip -0 $ZIP_PASSWORD $DEST/update.bin setup.sh
-[ -f update-splash.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-splash.gz
-[ -f update-terminated.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-terminated.gz
-[ -f $KERNEL_PKG ] && zip -0 $ZIP_PASSWORD $DEST/update.bin $KERNEL_PKG
-[ -f $UBOOT_PKG ] && zip -0 $ZIP_PASSWORD $DEST/update.bin $UBOOT_PKG
-[ -f $ROOTFS_PKG ] && zip -0 $ZIP_PASSWORD $DEST/update2.bin $ROOTFS_PKG
-[ -f $APP_PKG ] && zip -0 $ZIP_PASSWORD $DEST/update3.bin $APP_PKG
+zip -0 -P $ZIP_PASSWORD $DEST/update.bin setup.sh
+[ -f update-splash.gz ]     && zip -0 -P $ZIP_PASSWORD $DEST/update.bin update-splash.gz
+[ -f update-terminated.gz ] && zip -0 -P $ZIP_PASSWORD $DEST/update.bin update-terminated.gz
+[ -f $KERNEL_PKG ]          && zip -0 -P $ZIP_PASSWORD $DEST/update.bin $KERNEL_PKG
+[ -f $UBOOT_PKG ]           && zip -0 -P $ZIP_PASSWORD $DEST/update.bin $UBOOT_PKG
+[ -f $ROOTFS_PKG ]          && zip -0 -P $ZIP_PASSWORD $DEST/update2.bin $ROOTFS_PKG
+[ -f $APP_PKG ]             && zip -0 -P $ZIP_PASSWORD $DEST/update3.bin $APP_PKG
 cd ..
 
 #copy live image
@@ -183,9 +219,10 @@ rm -rf ./output
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
 echo -e '\E[1;33mVersions: '
-[ $skipuboot = 0 ]  && echo 'U-Boot ' $UBOOT_VERSION
-[ $skipspl = 0 ]    && echo 'SPL    ' $SPL_VERSION
-[ $skipkernel = 0 ] && echo 'Kernel ' $KERNEL_VERSION
-[ $skiprootfs = 0 ] && echo 'Rootfs ' $ROOTFS_VERSION
+[ $skipuboot = 0 ]   && echo 'U-Boot ' $UBOOT_VERSION
+[ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
+[ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
+[ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
+[ $update_nand = 1 ] && echo 'WID     WID0571_'$dt_version
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
