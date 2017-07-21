@@ -180,7 +180,7 @@ nandwrite -p /dev/mtd1 kernel/$dt_file
 #--------------
 if [ -f $bootmedia/update2.bin ]; then
 	message "Installing rootfs update -> $dest_rootfs_partition"
-	UBISIZE=$(unzip -l /run/media/sda1/update2.bin | grep rootfs.ubi | awk '{print $1}')
+	UBISIZE=$(unzip -l $bootmedia/update2.bin | grep rootfs.ubi | awk '{print $1}')
 	unzip -p -P $ZIP_PASSWORD $bootmedia/update2.bin | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
 fi
 
