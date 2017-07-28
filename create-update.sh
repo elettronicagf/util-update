@@ -3,11 +3,11 @@
 ZIP_PASSWORD='8fX589i2ed_@YT#xx++]]00$aqe34=='
 #"-P password"
 
-UBOOT_VERSION=0571-001
+UBOOT_VERSION=0572-001
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=0571-002
+KERNEL_VERSION=0572-001
 ROOTFS_VERSION=1.0
-ROOTFSLIVE_VERSION=0571-001
+ROOTFSLIVE_VERSION=0572-001
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -25,7 +25,7 @@ APP_BINARIES=$HOME/binaries/app
 
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
-YOCTO_IMAGE=0571consolesmart-$ROOTFS_VERSION
+YOCTO_IMAGE=0572consolefulltouch-$ROOTFS_VERSION
 
 skippartitioning=1
 skipuboot=0
@@ -34,10 +34,9 @@ skipkernel=0
 skiprootfs=0
 update_nand=0
 dt_version=0
-cpu_type=0
 
 # ./create-update.sh --makepartition --nand --dt=AA01.01 --cpu=ul
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID | --cpu=[ul/ull] --help]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -63,7 +62,6 @@ do
         --makepartition ) skippartitioning=0; shift;;
         --nand )          update_nand=1; shift;;
         --dt )            dt_version=$2; shift 2;;
-        --cpu )           cpu_type='mx6'$2; shift 2;;
         --help )          usage; shift;;
 	    -- )              shift; break;;
 		* )               break;
@@ -75,11 +73,6 @@ if [ $update_nand = 1 ]; then
 		error "Error: missing required parameter 'dt'"
 		exit
 	fi
-	
-	if [ $cpu_type = 0 ]; then
-		error "Error: missing required parameter 'cpu'"
-		exit
-	fi	
 	
 	if [ $skippartitioning = 0 ]; then
 		error "Error: option 'makepartition' is incompatible with option 'nand'"
@@ -122,12 +115,12 @@ rm ./* 1>/dev/null 2>&1
 
 if [ $skipuboot = 0 ]; then
 	message "Adding u-boot"
-	cp $UBOOT_BINARIES/u-boot.img-$cpu_type-$UBOOT_VERSION ./u-boot.img
+	cp $UBOOT_BINARIES/u-boot.img-$UBOOT_VERSION ./u-boot.img
 fi
 
 if [ $skipspl = 0 ]; then
 	message "Adding SPL"
-	cp $UBOOT_BINARIES/SPL-$cpu_type-$SPL_VERSION ./spl.img
+	cp $UBOOT_BINARIES/SPL-$SPL_VERSION ./spl.img
 fi
 
 if [[ $skipspl = 0 || $skipuboot = 0 ]]; then
@@ -185,7 +178,7 @@ fi
 
 if [ $update_nand = 1 ]; then
 	sed -i 's/type=emmc/type=nand/g' setup.sh
-	sed -i 's/dt_file=XX/dt_file=imx6-egf-WID0571_'$dt_version'.dtb/g' setup.sh
+	sed -i 's/dt_file=XX/dt_file=imx6-egf-WID0510_'$dt_version'.dtb/g' setup.sh
 fi
 
 #update zip password
@@ -223,6 +216,6 @@ echo -e '\E[1;33mVersions: '
 [ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
 [ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
 [ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
-[ $update_nand = 1 ] && echo 'WID     WID0571_'$dt_version
+[ $update_nand = 1 ] && echo 'WID     WID0510_'$dt_version
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;

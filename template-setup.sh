@@ -129,9 +129,9 @@ if [ -f $source/uboot.tar.gz ]; then
     message "Installing u-boot update -> $mtd_spl $mtd_uboot" 
     
     #rw nor
-    echo 112 > /sys/class/gpio/export
-    echo out > /sys/class/gpio/gpio112/direction
-    echo 1 > /sys/class/gpio/gpio112/value
+    echo 90 > /sys/class/gpio/export
+    echo out > /sys/class/gpio/gpio90/direction
+    echo 1 > /sys/class/gpio/gpio90/value
     
 	mkdir ./uboot
 	installPackage $source/uboot.tar.gz ./uboot
@@ -153,7 +153,7 @@ if [ -f $source/uboot.tar.gz ]; then
 	fi	
 	
 	#ro nor
-	echo 0 > /sys/class/gpio/gpio112/value
+	echo 0 > /sys/class/gpio/gpio90/value
 fi
 
 if [ $type=nand ]; then #update nand
