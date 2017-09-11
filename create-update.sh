@@ -1,13 +1,24 @@
 #!/bin/sh
 #set -x
-ZIP_PASSWORD='8fX589i2ed_@YT#xx++]]00$aqe34=='
+
+checkfile() {
+    if [ -f $1 ]; then
+		printf "\x1B[1;37m%-20s\t\E[1;32mOK\E[0m\n" $(basename $1)
+    else
+		printf "\x1B[1;37m%-20s\t\E[1;32mnot found\E[0m\n" $(basename $1)
+    fi
+}
+
+#if password is used parameter '-P' must be inside $ZIP_PASSWORD field
+#ZIP_PASSWORD='-P 8fX589i2ed_@YT#xx++]]00$aqe34=='
+ZIP_PASSWORD=''
 #"-P password"
 
-UBOOT_VERSION=0572-001
+UBOOT_VERSION=0508-008
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=0572-001
+KERNEL_VERSION=0508-007
 ROOTFS_VERSION=1.0
-ROOTFSLIVE_VERSION=0572-001
+ROOTFSLIVE_VERSION=0508-007
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -25,7 +36,7 @@ APP_BINARIES=$HOME/binaries/app
 
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
-YOCTO_IMAGE=0572consolefulltouch-$ROOTFS_VERSION
+YOCTO_IMAGE=0508consolecptimx6qdl-$ROOTFS_VERSION
 
 skippartitioning=1
 skipuboot=0
@@ -34,9 +45,10 @@ skipkernel=0
 skiprootfs=0
 update_nand=0
 dt_version=0
+silent=1
 
-# ./create-update.sh --makepartition --nand --dt=AA01.01 --cpu=ul
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID --help]" 1>&2; exit 1; }
+# ./create-update.sh --makepartition
+usage() { echo "Usage: $0 [--no-silent | --no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -47,7 +59,7 @@ error() {
 	echo " "	
 }
 
-TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,nand,dt:,cpu:,help -- "$@")
+TEMP=$(getopt -o 1 -l no-silent,no-uboot,no-spl,no-kernel,no-rootfs,makepartition,nand,dt:,cpu:,help -- "$@")
 [ $? -eq 1 ] && exit
 
 eval set -- "$TEMP"
@@ -55,6 +67,7 @@ eval set -- "$TEMP"
 while true
 do
     case "$1" in
+		--no-silent)	  silent=0; shift;;
         --no-uboot )      skipuboot=1; shift;;
         --no-spl )        skipspl=1; shift;;
         --no-kernel )     skipkernel=1; shift;;
@@ -113,14 +126,22 @@ gzip < tmp/update-terminated.bin > $OUTPUT/update-terminated.gz
 cd tmp
 rm ./* 1>/dev/null 2>&1
 
+[ silent = 1 ] && touch silent.boot 
+
 if [ $skipuboot = 0 ]; then
 	message "Adding u-boot"
 	cp $UBOOT_BINARIES/u-boot.img-$UBOOT_VERSION ./u-boot.img
+	cp $UBOOT_BINARIES/u-boot-silent.img-$UBOOT_VERSION ./u-boot-silent.img
+    checkfile ./u-boot.img
+    checkfile ./u-boot-silent.img	
 fi
 
 if [ $skipspl = 0 ]; then
 	message "Adding SPL"
 	cp $UBOOT_BINARIES/SPL-$SPL_VERSION ./spl.img
+	cp $UBOOT_BINARIES/SPL-silent-$SPL_VERSION ./spl-silent.img
+	checkfile ./spl.img
+	checkfile ./spl-silent.img
 fi
 
 if [[ $skipspl = 0 || $skipuboot = 0 ]]; then
@@ -178,7 +199,7 @@ fi
 
 if [ $update_nand = 1 ]; then
 	sed -i 's/type=emmc/type=nand/g' setup.sh
-	sed -i 's/dt_file=XX/dt_file=imx6-egf-WID0510_'$dt_version'.dtb/g' setup.sh
+	sed -i 's/dt_file=XX/dt_file=imx6-egf-WID0508_'$dt_version'.dtb/g' setup.sh
 fi
 
 #update zip password
@@ -187,13 +208,14 @@ cp setup.sh ../
 
 #build update file
 message "Packaging files"
-zip -0 -P $ZIP_PASSWORD $DEST/update.bin setup.sh
-[ -f update-splash.gz ]     && zip -0 -P $ZIP_PASSWORD $DEST/update.bin update-splash.gz
-[ -f update-terminated.gz ] && zip -0 -P $ZIP_PASSWORD $DEST/update.bin update-terminated.gz
-[ -f $KERNEL_PKG ]          && zip -0 -P $ZIP_PASSWORD $DEST/update.bin $KERNEL_PKG
-[ -f $UBOOT_PKG ]           && zip -0 -P $ZIP_PASSWORD $DEST/update.bin $UBOOT_PKG
-[ -f $ROOTFS_PKG ]          && zip -0 -P $ZIP_PASSWORD $DEST/update2.bin $ROOTFS_PKG
-[ -f $APP_PKG ]             && zip -0 -P $ZIP_PASSWORD $DEST/update3.bin $APP_PKG
+#zip -0 $ZIP_PASSWORD $DEST/update.bin setup.sh
+tar cvf $DEST/update.tar setup.sh
+[ -f update-splash.gz ]     && tar rvf $DEST/update.tar update-splash.gz
+[ -f update-terminated.gz ] && tar rvf $DEST/update.tar update-terminated.gz
+[ -f $KERNEL_PKG ]          && tar rvf $DEST/update.tar $KERNEL_PKG
+[ -f $UBOOT_PKG ]           && tar rvf $DEST/update.tar $UBOOT_PKG
+[ -f $ROOTFS_PKG ]          && zip -0 $ZIP_PASSWORD $DEST/update2.bin $ROOTFS_PKG
+[ -f $APP_PKG ]             && zip -0 $ZIP_PASSWORD $DEST/update3.bin $APP_PKG
 cd ..
 
 #copy live image
@@ -206,8 +228,8 @@ fi
 cp $IMAGES/logo-updating.bmp $DEST/logo.bmp
 
 #cleanup
-rm -rf ./tmp
-rm -rf ./output
+#rm -rf ./tmp
+#rm -rf ./output
 
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
@@ -216,6 +238,8 @@ echo -e '\E[1;33mVersions: '
 [ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
 [ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
 [ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
-[ $update_nand = 1 ] && echo 'WID     WID0510_'$dt_version
+[ $update_nand = 1 ] && echo 'WID     WID0508_'$dt_version
+echo
+[ $silent = 0 ] && echo 'Silent mode not active (do not release)'
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;

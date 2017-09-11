@@ -1,3 +1,4 @@
+set -x
 
 message() {
 	echo "##### $1 #####"
@@ -56,16 +57,16 @@ elif [ $type = nand ]; then
 	message "Updating NAND"
 fi
 
-if [ $type=nand ]; then
-	mtd_spl=/dev/mtd4
-	mtd_uboot=/dev/mtd5
+if [ $type = nand ]; then
+	mtd_spl=/dev/mtd0
+	mtd_uboot=/dev/mtd1
 	dest_kernel_partition=/dev/mtd0
 	dest_dtb_partition=/dev/mtd1
 	dest_rootfs_partition=/dev/mtd2
 	dest_app_partition=/dev/mtd3
 else
-	mtd_spl=/dev/mtd4
-	mtd_uboot=/dev/mtd5
+	mtd_spl=/dev/mtd0
+	mtd_uboot=/dev/mtd1
 	dest_boot_partition=/run/media/$dest_dev'p1'
 	dest_rootfs_partition=/run/media/$dest_dev'p2'
 	dest_app_partition=/run/media/$dest_dev'p2'
@@ -80,7 +81,7 @@ cd $source
 #show splash screen
 zcat update-splash.gz > /dev/fb0
 
-if [ $type!=nand ]; then
+if [ $type != nand ]; then
 #----------------------
 # partizionamento emmc:
 #Disk /dev/mmcblk2: , 3909091328 bytes
@@ -96,8 +97,13 @@ if [ $mkfs = 1 ]; then
 	umount /dev/$dest_dev'p'*
 	
 	sleep 6
-	
+		
 	echo -e "d\n3\nd\n2\nd\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n+1G\nn\np\n3\n\n\nw\n" | fdisk /dev/$dest_dev
+
+	#wipe fs to prevent mounting
+	dd if=/dev/zero of=/dev/$dest_dev'p1' bs=1M count=1
+	dd if=/dev/zero of=/dev/$dest_dev'p2' bs=1M count=1
+	dd if=/dev/zero of=/dev/$dest_dev'p3' bs=1M count=1
 
 	mkfs.vfat /dev/$dest_dev'p1'
     if [ $? -ne 0 ]; then 
@@ -108,14 +114,14 @@ if [ $mkfs = 1 ]; then
 	mkfs.ext4 /dev/$dest_dev'p2'
     if [ $? -ne 0 ]; then 
         umount /dev/$dest_dev'p2'
-        mkfs.ext4 /dev/$dest_dev'p2'
+        mkfs.ext4 -F -F /dev/$dest_dev'p2'
     fi
     
 	mkfs.ext4 /dev/$dest_dev'p3'
     if [ $? -ne 0 ]; then 
         umount /dev/$dest_dev'p3'
-        mkfs.ext4 /dev/$dest_dev'p3'
-    fi        
+        mkfs.ext4 -F -F /dev/$dest_dev'p3'
+    fi
     
 	udevadm trigger --action=add
 	udevadm settle --timeout=10
@@ -129,9 +135,9 @@ if [ -f $source/uboot.tar.gz ]; then
     message "Installing u-boot update -> $mtd_spl $mtd_uboot" 
     
     #rw nor
-    echo 90 > /sys/class/gpio/export
-    echo out > /sys/class/gpio/gpio90/direction
-    echo 1 > /sys/class/gpio/gpio90/value
+    echo 72 > /sys/class/gpio/export
+    echo out > /sys/class/gpio/gpio72/direction
+    echo 1 > /sys/class/gpio/gpio72/value
     
 	mkdir ./uboot
 	installPackage $source/uboot.tar.gz ./uboot
@@ -139,7 +145,7 @@ if [ -f $source/uboot.tar.gz ]; then
 	#update u-boot
 	flash_unlock $mtd_uboot
 	[ -f ./uboot/u-boot.img ] && flashcp ./uboot/u-boot.img  $mtd_uboot
-	flash_lock $mtd_uboot
+	#flash_lock $mtd_uboot
 	
 	#update spl
 	if [ -f ./uboot/spl.img ]; then
@@ -149,14 +155,14 @@ if [ -f $source/uboot.tar.gz ]; then
 		cp spl-header.bin mtdspl.bin
 		cat ./uboot/spl.img >> mtdspl.bin
 		flashcp mtdspl.bin  $mtd_spl
-		flash_lock $mtd_spl
+		#flash_lock $mtd_spl
 	fi	
 	
 	#ro nor
-	echo 0 > /sys/class/gpio/gpio90/value
+	#echo 0 > /sys/class/gpio/gpio72/value
 fi
 
-if [ $type=nand ]; then #update nand
+if [ $type = nand ]; then #update nand
 #--------------
 # kernel
 #--------------
@@ -181,7 +187,7 @@ nandwrite -p /dev/mtd1 kernel/$dt_file
 if [ -f $bootmedia/update2.bin ]; then
 	message "Installing rootfs update -> $dest_rootfs_partition"
 	UBISIZE=$(unzip -l $bootmedia/update2.bin | grep rootfs.ubi | awk '{print $1}')
-	unzip -p -P $ZIP_PASSWORD $bootmedia/update2.bin | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
+	unzip -p $ZIP_PASSWORD $bootmedia/update2.bin | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
 fi
 
 #--------------
@@ -194,9 +200,9 @@ if [ -f $bootmedia/update3.bin ]; then
 	ubimkvol /dev/ubi0 -N app -m
 	mkdir -p /run/media/home/
 	mount -t ubifs ubi0:app /run/media/home/
-	unzip -p -P $ZIP_PASSWORD $bootmedia/update3.bin | tar xzf - -C /run/media/home/
+	unzip -p $ZIP_PASSWORD $bootmedia/update3.bin | tar xzf - -C /run/media/home/
 fi
-
+    #da implementare :)
 else #update emmc/mmc
 #--------------
 # kernel
@@ -209,7 +215,7 @@ installPackage $source/kernel.tar.gz $dest_boot_partition
 #--------------
 if [ -f $bootmedia/update2.bin ]; then
 	message "Installing rootfs update -> $dest_rootfs_partition"
-	unzip -p -P $ZIP_PASSWORD $bootmedia/update2.bin | tar xjf - -C $dest_rootfs_partition
+	unzip -p $ZIP_PASSWORD $bootmedia/update2.bin | tar xjf - -C $dest_rootfs_partition
 fi
 
 umount /dev/$dest_dev'p'*
@@ -226,5 +232,3 @@ umount /dev/sda2
 
 #notify update is terminated
 zcat $source/update-terminated.gz > /dev/fb0
-
-
