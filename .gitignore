@@ -1,2 +1,5 @@
 usb-key
 binaries
+output
+tmp
+setup.sh
