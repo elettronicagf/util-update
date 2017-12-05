@@ -1,5 +1,4 @@
 #!/bin/sh
-#set -x
 
 checkfile() {
     if [ -f $1 ]; then
@@ -9,32 +8,20 @@ checkfile() {
     fi
 }
 
-#if password is used parameter '-P' must be inside $ZIP_PASSWORD field
-#ZIP_PASSWORD='-P 8fX589i2ed_@YT#xx++]]00$aqe34=='
-ZIP_PASSWORD=''
-#"-P password"
+UPDATEFILE=update.tar
+ROOTFS_PKG=rootfs.tar.gz
+KERNEL_PKG=kernel.tar.gz
+UBOOT_PKG=uboot.tar.gz
+APP_PKG=app.tar.gz
+KERNEL_BINARIES=kernel/binaries
+UBOOT_BINARIES=u-boot/binaries
 
 UBOOT_VERSION=0508-008
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=0508-007
+KERNEL_VERSION=0508-009
 ROOTFS_VERSION=1.0
 ROOTFSLIVE_VERSION=0508-007
-
-HOME=$(pwd)
-OUTPUT=$HOME/output
-IMAGES=$HOME/images
-DEST=$HOME/usb-key
-ROOTFS_PKG=rootfs.tar.bz2
-KERNEL_PKG=kernel.tar.gz
-UBOOT_PKG=uboot.tar.gz
-KERNEL_BINARIES=$HOME/binaries/kernel/$KERNEL_VERSION
-KERNEL_LIVE_BINARIES=$HOME/binaries/kernel/$ROOTFSLIVE_VERSION-live
-UBOOT_BINARIES=$HOME/binaries/u-boot
-ROOTFS_BINARIES=$HOME/binaries/rootfs
-APP_PKG=app.tar.gz
-APP_BINARIES=$HOME/binaries/app
-
-MODULES_FILE=modules_$KERNEL_VERSION.tgz
+APP_VERSION=001
 
 YOCTO_IMAGE=0508consolecptimx6qdl-$ROOTFS_VERSION
 
@@ -43,109 +30,92 @@ skipuboot=0
 skipspl=0
 skipkernel=0
 skiprootfs=0
-update_nand=0
-dt_version=0
-silent=1
+skipapp=0
 
-# ./create-update.sh --makepartition
-usage() { echo "Usage: $0 [--no-silent | --no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID --help]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --no-app | --makepartition | --help]" 1>&2; exit 1; }
 
-message() {
-	echo -e '\E[1;33m'$1'\E[0m'	
-}
-
-error() {
-	echo -e '\E[1;31m'$1'\E[0m'
-	echo " "	
-}
-
-TEMP=$(getopt -o 1 -l no-silent,no-uboot,no-spl,no-kernel,no-rootfs,makepartition,nand,dt:,cpu:,help -- "$@")
-[ $? -eq 1 ] && exit
-
+TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,no-app,makepartition,help -- "$@")
 eval set -- "$TEMP"
 
 while true
 do
     case "$1" in
-		--no-silent)	  silent=0; shift;;
-        --no-uboot )      skipuboot=1; shift;;
-        --no-spl )        skipspl=1; shift;;
-        --no-kernel )     skipkernel=1; shift;;
-        --no-rootfs )     skiprootfs=1; shift;;
+        --no-uboot )  skipuboot=1; shift;;
+        --no-spl )    skipspl=1; shift;;
+        --no-kernel ) skipkernel=1; shift;;
+        --no-rootfs ) skiprootfs=1; shift;;
+        --no-app )    skipapp=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
-        --nand )          update_nand=1; shift;;
-        --dt )            dt_version=$2; shift 2;;
-        --help )          usage; shift;;
-	    -- )              shift; break;;
-		* )               break;
+        --help )      usage; shift;;
+	    -- ) shift; break;;
+		* ) break;
     esac
 done
 
-if [ $update_nand = 1 ]; then
-	if [ $dt_version = 0 ]; then
-		error "Error: missing required parameter 'dt'"
-		exit
-	fi
-	
-	if [ $skippartitioning = 0 ]; then
-		error "Error: option 'makepartition' is incompatible with option 'nand'"
-		exit
-	fi
-fi	
-
 #create dirs
-rm -rf $DEST
-rm -rf $OUTPUT
-rm -rf tmp
-sudo rm -rf $APP_BINARIES/*
-
-mkdir -p $DEST
-mkdir -p $OUTPUT
-mkdir tmp
+[ ! -d update-app ] && mkdir update-app
+[ ! -d update-kernel ] && mkdir update-kernel
+[ ! -d update-uboot ] && mkdir update-uboot
+[ ! -d update-rootfs ] && mkdir update-rootfs
+[ ! -d usb-key ] && mkdir usb-key
+[ ! -d liveimage ] && mkdir liveimage
 
 #cleanup
-#rm ./images/*.bgr 1>/dev/null 2>&1
+rm ./*.bgr 1>/dev/null 2>&1
 rm ./*.tar 1>/dev/null 2>&1
 rm ./*.gz 1>/dev/null 2>&1
-rm setup.sh 1>/dev/null 2>&1
+rm ./update-kernel/* 1>/dev/null 2>&1
+rm ./update-uboot/* 1>/dev/null 2>&1
+rm ./update-rootfs/* 1>/dev/null 2>&1
+rm ./usb-key/* 1>/dev/null 2>&1
+rm ./update-key/* 1>/dev/null 2>&1
+rm ./liveimage/* 1>/dev/null 2>&1
 
-#--------------------------------------------------------------------------------------------------------
-#create your own graphics
-#each image must match the screen resolution and framebuffer format (rgb,bgr,rgb565,..)
-#--------------------------------------------------------------------------------------------------------
 #graphics
-message "Building graphics"
-avconv  -i $IMAGES/logo-updating.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash.bin 1>/dev/null 2>&1
-gzip < tmp/update-splash.bin > $OUTPUT/update-splash.gz
-avconv  -i $IMAGES/logo-update-terminated.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated.bin 1>/dev/null 2>&1
-gzip < tmp/update-terminated.bin > $OUTPUT/update-terminated.gz
-#cp images/logo-boot.bmp $OUTPUT/logo.bmp
+echo Building graphics
+convert -rotate 180 logo-itema-updating.bmp update-splash.bgr
+gzip < update-splash.bgr > update-splash.gz
+
+convert -rotate 180 logo-itema-update-terminated.bmp update-terminated.bgr
+gzip < update-terminated.bgr > update-terminated.gz
+
+#build app update
+#----------------
+if [ $skipapp = 0 ]; then
+echo Building application update
+cd update-app
+if [ -f app-$APP_VERSION.tar.gz ]; then
+  cp app-$APP_VERSION.tar.gz ../$APP_PKG
+  checkfile ../$APP_PKG
+else
+  echo Application update not found: app-$APP_VERSION.tar.gz
+fi
+cd ..
+fi
 
 #build u-boot+SPL update
 #-------------------
-cd tmp
+cd update-uboot
 rm ./* 1>/dev/null 2>&1
 
-[ silent = 1 ] && touch silent.boot 
-
 if [ $skipuboot = 0 ]; then
-	message "Adding u-boot"
-	cp $UBOOT_BINARIES/u-boot.img-$UBOOT_VERSION ./u-boot.img
-	cp $UBOOT_BINARIES/u-boot-silent.img-$UBOOT_VERSION ./u-boot-silent.img
-    checkfile ./u-boot.img
-    checkfile ./u-boot-silent.img	
+echo Building u-boot update
+#update u-boot
+cp ../../$UBOOT_BINARIES/u-boot.img-$UBOOT_VERSION ./u-boot.img
+cp ../../$UBOOT_BINARIES/u-boot-silent.img-$UBOOT_VERSION ./u-boot-silent.img
+checkfile ./u-boot.img
+checkfile ./u-boot-silent.img
 fi
 
 if [ $skipspl = 0 ]; then
-	message "Adding SPL"
-	cp $UBOOT_BINARIES/SPL-$SPL_VERSION ./spl.img
-	cp $UBOOT_BINARIES/SPL-silent-$SPL_VERSION ./spl-silent.img
-	checkfile ./spl.img
-	checkfile ./spl-silent.img
+cp ../../$UBOOT_BINARIES/SPL-$SPL_VERSION ./spl.img
+cp ../../$UBOOT_BINARIES/SPL-silent-$SPL_VERSION ./spl-silent.img
+checkfile ./spl.img
+checkfile ./spl-silent.img
 fi
 
 if [[ $skipspl = 0 || $skipuboot = 0 ]]; then
-	tar czvf $OUTPUT/$UBOOT_PKG *
+tar czvf ../$UBOOT_PKG *
 fi
 cd ..
 
@@ -153,93 +123,75 @@ cd ..
 #build kernel update
 #-------------------
 if [ $skipkernel = 0 ]; then
-	message "Adding kernel"
-    filename_modules=$KERNEL_BINARIES/$MODULES_FILE
-    
-	if [ -e $filename_modules ]; then
-		message "Adding modules"
-		
-		cd $APP_BINARIES
-		sudo tar xf $filename_modules .
-		sudo chown -R root:root $APP_BINARIES/*
-		tar czf $OUTPUT/$APP_PKG -C $APP_BINARIES .
-	fi
-	
-	#update kernel
-	cd $KERNEL_BINARIES
-	if [ $update_nand = 1 ]; then
-		tar czvf $OUTPUT/$KERNEL_PKG zImage *$dt_version.dtb
-	else
-		tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
-	fi
-	cd $HOME
+echo Building kernel update
+cd update-kernel
+[ -f $KERNEL_PKG ] && rm $KERNEL_PKG
+#update kernel
+cp ../../$KERNEL_BINARIES/$KERNEL_VERSION/* .
+checkfile ./zImage
+#copy uboot logo
+convert -rotate 180 ../logo-itema-loading.bmp ./logo-itema.bmp
+tar czvf ../$KERNEL_PKG *
+cd ..
 fi
 
 #build rootfs update
 #-------------------
 if [ $skiprootfs = 0 ]; then
-	message "Adding rootfs"
-	#update rootfs
-	if [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi ]; then
-		ROOTFS_PKG=rootfs.ubi
-		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi $OUTPUT/$ROOTFS_PKG
-	elif [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 ]; then
-		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 $OUTPUT/$ROOTFS_PKG
-	fi
+cd update-rootfs
+echo Building rootfs update
+rm ./* 1>/dev/null 2>&1
+#update rootfs
+cp /data2/developer/yocto_rootfs/$YOCTO_IMAGE.tar.bz2 .
+if [ -f $YOCTO_IMAGE.tar.bz2 ]; then
+    echo converting yocto rootfs into gzip...
+	bunzip2 $YOCTO_IMAGE.tar.bz2
+	gzip $YOCTO_IMAGE.tar
+	mv $YOCTO_IMAGE.tar.gz ../$ROOTFS_PKG
+else
+	tar czvf ../$ROOTFS_PKG *
+fi
+cd ..
 fi
 
-cd $HOME
-cp template-setup.sh $OUTPUT/setup.sh
-cd $OUTPUT
+cp template-setup.sh setup.sh
 
 #force make partition
 if [ $skippartitioning = 0 ]; then
 	sed -i 's/mkfs=0/mkfs=1/g' setup.sh
 fi
 
-if [ $update_nand = 1 ]; then
-	sed -i 's/type=emmc/type=nand/g' setup.sh
-	sed -i 's/dt_file=XX/dt_file=imx6-egf-WID0508_'$dt_version'.dtb/g' setup.sh
-fi
+[ -f silent.boot ] && rm silent.boot 
+#touch silent.boot 
 
-#update zip password
-sed -i 's/ZIP_PASSWORD=""/ZIP_PASSWORD='"'"$ZIP_PASSWORD"'"'/g' setup.sh
-cp setup.sh ../
 
 #build update file
-message "Packaging files"
-#zip -0 $ZIP_PASSWORD $DEST/update.bin setup.sh
-tar cvf $DEST/update.tar setup.sh
-[ -f update-splash.gz ]     && tar rvf $DEST/update.tar update-splash.gz
-[ -f update-terminated.gz ] && tar rvf $DEST/update.tar update-terminated.gz
-[ -f $KERNEL_PKG ]          && tar rvf $DEST/update.tar $KERNEL_PKG
-[ -f $UBOOT_PKG ]           && tar rvf $DEST/update.tar $UBOOT_PKG
-[ -f $ROOTFS_PKG ]          && zip -0 $ZIP_PASSWORD $DEST/update2.bin $ROOTFS_PKG
-[ -f $APP_PKG ]             && zip -0 $ZIP_PASSWORD $DEST/update3.bin $APP_PKG
-cd ..
+echo Packaging files
+tar cvf $UPDATEFILE installPackage.sh setup.sh
+tar uvf $UPDATEFILE update-splash.gz
+tar uvf $UPDATEFILE update-terminated.gz
+[ -f kernel.tar.gz ] && tar uvf $UPDATEFILE kernel.tar.gz
+[ -f uboot.tar.gz ] && tar uvf $UPDATEFILE uboot.tar.gz
+[ -f app.tar.gz ] && tar uvf $UPDATEFILE app.tar.gz
+[ -f rootfs.tar.gz ] && tar uvf $UPDATEFILE rootfs.tar.gz
+[ -f silent.boot ] && tar uvf $UPDATEFILE silent.boot
+
+#copy update package
+cp $UPDATEFILE ./usb-key/
 
 #copy live image
-if [ -f $KERNEL_LIVE_BINARIES/zImage ]; then
-	cp $KERNEL_LIVE_BINARIES/* $DEST
-else
-    error "Live image not found"
-fi
-
-cp $IMAGES/logo-updating.bmp $DEST/logo.bmp
+cp ../$KERNEL_BINARIES/$ROOTFSLIVE_VERSION-live/* ./usb-key/
 
 #cleanup
-#rm -rf ./tmp
-#rm -rf ./output
+rm ./*.bgr
 
 echo
-echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
-echo -e '\E[1;33mVersions: '
-[ $skipuboot = 0 ]   && echo 'U-Boot ' $UBOOT_VERSION
-[ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
-[ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
-[ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
-[ $update_nand = 1 ] && echo 'WID     WID0508_'$dt_version
+echo -e  '\E[1;37mUpdate package is stored in ./usb-key path'
+echo -e '\E[1;33mPackages: '
+[ $skipuboot = 0 ]  && echo 'U-Boot ' $UBOOT_VERSION
+[ $skipspl = 0 ]    && echo 'SPL    ' $SPL_VERSION
+[ $skipkernel = 0 ] && echo 'Kernel ' $KERNEL_VERSION
+[ $skiprootfs = 0 ] && echo 'Rootfs ' $ROOTFS_VERSION
+[ $skipapp = 0 ]    && echo 'App    ' $APP_VERSION
 echo
-[ $silent = 0 ] && echo 'Silent mode not active (do not release)'
-echo
-[ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
+[ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be recreated !!!'; echo;
