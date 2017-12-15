@@ -16,12 +16,12 @@ APP_PKG=app.tar.gz
 KERNEL_BINARIES=kernel/binaries
 UBOOT_BINARIES=u-boot/binaries
 
-UBOOT_VERSION=0508-008
+UBOOT_VERSION=0508-009
 SPL_VERSION=$UBOOT_VERSION
 KERNEL_VERSION=0508-009
-ROOTFS_VERSION=1.0
-ROOTFSLIVE_VERSION=0508-007
-APP_VERSION=001
+ROOTFS_VERSION=2.0
+ROOTFSLIVE_VERSION=0508-008
+APP_VERSION=002
 
 YOCTO_IMAGE=0508consolecptimx6qdl-$ROOTFS_VERSION
 
@@ -73,10 +73,10 @@ rm ./liveimage/* 1>/dev/null 2>&1
 
 #graphics
 echo Building graphics
-convert -rotate 180 logo-itema-updating.bmp update-splash.bgr
+convert logo-itema-updating.bmp update-splash.bgr
 gzip < update-splash.bgr > update-splash.gz
 
-convert -rotate 180 logo-itema-update-terminated.bmp update-terminated.bgr
+convert logo-itema-update-terminated.bmp update-terminated.bgr
 gzip < update-terminated.bgr > update-terminated.gz
 
 #build app update
@@ -130,7 +130,7 @@ cd update-kernel
 cp ../../$KERNEL_BINARIES/$KERNEL_VERSION/* .
 checkfile ./zImage
 #copy uboot logo
-convert -rotate 180 ../logo-itema-loading.bmp ./logo-itema.bmp
+cp ../logo-itema-loading.bmp ./logo-itema.bmp
 tar czvf ../$KERNEL_PKG *
 cd ..
 fi
