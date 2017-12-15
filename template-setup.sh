@@ -1,3 +1,5 @@
+set -x
+
 source=$(dirname $0)
 destination=/run/media/mmcblk2
 apphome=/
@@ -17,14 +19,17 @@ zcat update-splash.gz > /dev/fb0
 #        Device Boot      Start         End      Blocks  Id System
 #/dev/mmcblk2p1               1         611       19544   c Win95 FAT32 (LBA)
 #/dev/mmcblk2p2             612      119296     3797920  83 Linux
+#/dev/mmcblk2p3             612      119296     3797920  83 Linux
 #----------------------
 if [ $mkfs = 1 ]; then
 	[ -d /run/media/mmcblk2p1 ] && umount /run/media/mmcblk2p1
 	[ -d /run/media/mmcblk2p2 ] && umount /run/media/mmcblk2p2
 	[ -d /run/media/mmcblk2p3 ] && umount /run/media/mmcblk2p3
-	echo -e "d\n4\nd\n3\nd\n2\nd\n1\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n\nw\n" | fdisk /dev/mmcblk2
+	echo -e "d\n4\nd\n3\nd\n2\nd\n1\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n+500M\nn\np\n3\n\n\nw\n" | fdisk /dev/mmcblk2
+	
 	mkfs.vfat /dev/mmcblk2p1
-	mkfs.ext3 /dev/mmcblk2p2
+	mkfs.ext4 /dev/mmcblk2p2
+	mkfs.ext4 /dev/mmcblk2p3
 	udevadm trigger --action=add
 	udevadm settle --timeout=5
 fi
@@ -66,10 +71,12 @@ echo Installing rootfs update...
 #--------------
 # Application 
 #--------------
-#per ora l'app è installata nella partizione p2 e non p3!
 echo Installing application update...
-mkdir -p "$destination"p2/$apphome
-./installPackage.sh $source/app.tar.gz "$destination"p2/$apphome
+umount "$destination"p3
+mount /dev/mmcblk2p3 "$destination"p2/home/root/
+
+#app installata in root perche' il tar.gz contiene gia' i percorsi assoluti
+./installPackage.sh $source/app.tar.gz "$destination"p2
 
 zcat update-terminated.gz > /dev/fb0
 
@@ -78,4 +85,5 @@ sync
 umount /dev/sda1
 umount /dev/sda2
 umount /dev/mmcblk2p1
+umount /dev/mmcblk2p3
 umount /dev/mmcblk2p2
