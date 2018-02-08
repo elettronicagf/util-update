@@ -12,24 +12,30 @@ zcat update-splash.gz > /dev/fb0
 
 #----------------------
 # partizionamento emmc:
-#Disk /dev/mmcblk2: 3909 MB, 3909091328 bytes
-#4 heads, 16 sectors/track, 119296 cylinders
-#Units = cylinders of 64 * 512 = 32768 bytes
+#Disk /dev/mmcblk2: 3.7 GiB, 3959422976 bytes, 7733248 sectors
+#Units: sectors of 1 * 512 = 512 bytes
+#Sector size (logical/physical): 512 bytes / 512 bytes
+#I/O size (minimum/optimal): 512 bytes / 512 bytes
+#Disklabel type: dos
+#Disk identifier: 0x00000000
 #
-#        Device Boot      Start         End      Blocks  Id System
-#/dev/mmcblk2p1               1         611       19544   c Win95 FAT32 (LBA)
-#/dev/mmcblk2p2             612      119296     3797920  83 Linux
-#/dev/mmcblk2p3             612      119296     3797920  83 Linux
+#Device         Boot     Start       End  Blocks  Id System
+#/dev/mmcblk2p1             16     39103   19544   c W95 FAT32 (LBA)
+#/dev/mmcblk2p2          39104   1015743  488320  83 Linux
+#/dev/mmcblk2p3        1015744   7070463 3027360  83 Linux
+#/dev/mmcblk2p4        7070464   7733247  331392  83 Linux
 #----------------------
 if [ $mkfs = 1 ]; then
 	[ -d /run/media/mmcblk2p1 ] && umount /run/media/mmcblk2p1
 	[ -d /run/media/mmcblk2p2 ] && umount /run/media/mmcblk2p2
 	[ -d /run/media/mmcblk2p3 ] && umount /run/media/mmcblk2p3
-	echo -e "d\n4\nd\n3\nd\n2\nd\n1\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n+500M\nn\np\n3\n\n\nw\n" | fdisk /dev/mmcblk2
+	[ -d /run/media/mmcblk2p3 ] && umount /run/media/mmcblk2p4
+	echo -e "d\n4\nd\n3\nd\n2\nd\n1\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n+500M\nn\np\n3\n\n+3100M\nn\np\n4\n\n\nw\n" | fdisk /dev/mmcblk2
 	
 	mkfs.vfat /dev/mmcblk2p1
 	mkfs.ext4 /dev/mmcblk2p2
 	mkfs.ext4 /dev/mmcblk2p3
+	mkfs.ext4 /dev/mmcblk2p4
 	udevadm trigger --action=add
 	udevadm settle --timeout=5
 fi
@@ -87,3 +93,4 @@ umount /dev/sda2
 umount /dev/mmcblk2p1
 umount /dev/mmcblk2p3
 umount /dev/mmcblk2p2
+umount /dev/mmcblk2p4
