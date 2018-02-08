@@ -84,9 +84,9 @@ mount /dev/mmcblk2p3 "$destination"p2/home/root/
 #app installata in root perche' il tar.gz contiene gia' i percorsi assoluti
 ./installPackage.sh $source/app.tar.gz "$destination"p2
 
-zcat update-terminated.gz > /dev/fb0
-
 sync
+
+zcat update-terminated.gz > /dev/fb0
 
 umount /dev/sda1
 umount /dev/sda2
