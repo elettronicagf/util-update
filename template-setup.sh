@@ -33,9 +33,29 @@ if [ $mkfs = 1 ]; then
 	echo -e "d\n4\nd\n3\nd\n2\nd\n1\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n+500M\nn\np\n3\n\n+3100M\nn\np\n4\n\n\nw\n" | fdisk /dev/mmcblk2
 	
 	mkfs.vfat /dev/mmcblk2p1
+    if [ $? -ne 0 ]; then 
+        umount /dev/mmcblk2p1
+        mkfs.vfat /dev/mmcblk2p1
+    fi
+    
 	mkfs.ext4 /dev/mmcblk2p2
+    if [ $? -ne 0 ]; then 
+        umount /dev/mmcblk2p2
+        mkfs.ext4 /dev/mmcblk2p2
+    fi
+    
 	mkfs.ext4 /dev/mmcblk2p3
+    if [ $? -ne 0 ]; then 
+        umount /dev/mmcblk2p3
+        mkfs.ext4 /dev/mmcblk2p3
+    fi   	
+	
 	mkfs.ext4 /dev/mmcblk2p4
+    if [ $? -ne 0 ]; then 
+        umount /dev/mmcblk2p4
+        mkfs.ext4 /dev/mmcblk2p4
+    fi  	
+	
 	udevadm trigger --action=add
 	udevadm settle --timeout=5
 fi
