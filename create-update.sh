@@ -1,13 +1,13 @@
 #!/bin/sh
 #set -x
-ZIP_PASSWORD='8fX589i2ed_@YT#xx++]]00$aqe34=='
-#"-P password"
+PASSWORD='47382e)9[xh?'
+SUPPORTED_DEVICES='0572'
 
-UBOOT_VERSION=0572-001
+UBOOT_VERSION=0572-004
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=0572-001
+KERNEL_VERSION=0572-004
 ROOTFS_VERSION=1.0
-ROOTFSLIVE_VERSION=0572-001
+ROOTFSLIVE_VERSION=0572-003
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -33,10 +33,9 @@ skipspl=0
 skipkernel=0
 skiprootfs=0
 update_nand=0
-dt_version=0
 
-# ./create-update.sh --makepartition --nand --dt=AA01.01 --cpu=ul
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --dt=WID --help]" 1>&2; exit 1; }
+# ./create-update.sh --makepartition --nand 
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -61,7 +60,6 @@ do
         --no-rootfs )     skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
         --nand )          update_nand=1; shift;;
-        --dt )            dt_version=$2; shift 2;;
         --help )          usage; shift;;
 	    -- )              shift; break;;
 		* )               break;
@@ -69,11 +67,6 @@ do
 done
 
 if [ $update_nand = 1 ]; then
-	if [ $dt_version = 0 ]; then
-		error "Error: missing required parameter 'dt'"
-		exit
-	fi
-	
 	if [ $skippartitioning = 0 ]; then
 		error "Error: option 'makepartition' is incompatible with option 'nand'"
 		exit
@@ -84,7 +77,6 @@ fi
 rm -rf $DEST
 rm -rf $OUTPUT
 rm -rf tmp
-sudo rm -rf $APP_BINARIES/*
 
 mkdir -p $DEST
 mkdir -p $OUTPUT
@@ -106,7 +98,10 @@ avconv  -i $IMAGES/logo-updating.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24
 gzip < tmp/update-splash.bin > $OUTPUT/update-splash.gz
 avconv  -i $IMAGES/logo-update-terminated.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated.bin 1>/dev/null 2>&1
 gzip < tmp/update-terminated.bin > $OUTPUT/update-terminated.gz
-#cp images/logo-boot.bmp $OUTPUT/logo.bmp
+avconv  -i $IMAGES/logo-update-error.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-error.bin 1>/dev/null 2>&1
+gzip < tmp/update-error.bin > $OUTPUT/update-error.gz
+
+cp template-setup.sh $OUTPUT/setup.sh
 
 #build u-boot+SPL update
 #-------------------
@@ -139,18 +134,32 @@ if [ $skipkernel = 0 ]; then
 		message "Adding modules"
 		
 		cd $APP_BINARIES
+		mkdir tmp
+		cd tmp
+		mkdir modules
+		cd modules
 		sudo tar xf $filename_modules .
-		sudo chown -R root:root $APP_BINARIES/*
-		tar czf $OUTPUT/$APP_PKG -C $APP_BINARIES .
+		cd ..
+		APP_TAR_NAME=${APP_PKG%.gz}
+		if [ ! -e $APP_BINARIES/$APP_PKG ]; then
+			touch test
+			tar cvf $APP_TAR_NAME test
+			tar --delete -f $APP_TAR_NAME test
+		else
+			gunzip -c $APP_BINARIES/$APP_PKG > $APP_TAR_NAME
+		fi
+		sudo chown -R root:root $APP_BINARIES/tmp/*
+		tar rf $APP_TAR_NAME modules
+		rm -rf modules
+		gzip $APP_TAR_NAME
+		cp $APP_PKG $OUTPUT/$APP_PKG
+		cd ..
+		rm -rf tmp
 	fi
 	
 	#update kernel
 	cd $KERNEL_BINARIES
-	if [ $update_nand = 1 ]; then
-		tar czvf $OUTPUT/$KERNEL_PKG zImage *$dt_version.dtb
-	else
-		tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
-	fi
+	tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
 	cd $HOME
 fi
 
@@ -168,7 +177,7 @@ if [ $skiprootfs = 0 ]; then
 fi
 
 cd $HOME
-cp template-setup.sh $OUTPUT/setup.sh
+
 cd $OUTPUT
 
 #force make partition
@@ -178,30 +187,73 @@ fi
 
 if [ $update_nand = 1 ]; then
 	sed -i 's/type=emmc/type=nand/g' setup.sh
-	sed -i 's/dt_file=XX/dt_file=imx6-egf-WID0510_'$dt_version'.dtb/g' setup.sh
 fi
 
-#update zip password
-sed -i 's/ZIP_PASSWORD=""/ZIP_PASSWORD='"'"$ZIP_PASSWORD"'"'/g' setup.sh
-cp setup.sh ../
 
-#build update file
-message "Packaging files"
-zip -0 -P $ZIP_PASSWORD $DEST/update.bin setup.sh
-[ -f update-splash.gz ]     && zip -0 -P $ZIP_PASSWORD $DEST/update.bin update-splash.gz
-[ -f update-terminated.gz ] && zip -0 -P $ZIP_PASSWORD $DEST/update.bin update-terminated.gz
-[ -f $KERNEL_PKG ]          && zip -0 -P $ZIP_PASSWORD $DEST/update.bin $KERNEL_PKG
-[ -f $UBOOT_PKG ]           && zip -0 -P $ZIP_PASSWORD $DEST/update.bin $UBOOT_PKG
-[ -f $ROOTFS_PKG ]          && zip -0 -P $ZIP_PASSWORD $DEST/update2.bin $ROOTFS_PKG
-[ -f $APP_PKG ]             && zip -0 -P $ZIP_PASSWORD $DEST/update3.bin $APP_PKG
-cd ..
+mkdir tmp
+cd tmp
+rm ./* 1>/dev/null 2>&1
 
+#Create 16MB FAT filesystem
+dd if=/dev/zero of=fat.bin bs=1M count=16
+echo ',,4;' | sfdisk fat.bin
+mkdir mnt
+FIRST_AVAILABLE_LOOP_DEV=$(losetup -f)
+losetup -P $FIRST_AVAILABLE_LOOP_DEV fat.bin
+mkfs.msdos $FIRST_AVAILABLE_LOOP_DEV'p1'
+mount $FIRST_AVAILABLE_LOOP_DEV'p1' mnt/
 #copy live image
 if [ -f $KERNEL_LIVE_BINARIES/zImage ]; then
-	cp $KERNEL_LIVE_BINARIES/* $DEST
+	cp $KERNEL_LIVE_BINARIES/* mnt/
 else
     error "Live image not found"
 fi
+cp $HOME/images/logo-boot.bmp mnt/logo.bmp
+umount $FIRST_AVAILABLE_LOOP_DEV'p1'
+losetup -d $FIRST_AVAILABLE_LOOP_DEV
+cd ..
+mv tmp/fat.bin .
+sync
+rm -rf tmp
+
+#update zip password
+sed -i 's/PASSWORD=""/PASSWORD='"'"$PASSWORD"'"'/g' setup.sh
+
+#configuring update
+if [ -e $UBOOT_PKG ]; then
+  sed -i 's/UPDATE_UBOOT="false"/UPDATE_UBOOT="true"/g' setup.sh
+fi;
+if [ -e $KERNEL_PKG ]; then
+  sed -i 's/UPDATE_KERNEL="false"/UPDATE_KERNEL="true"/g' setup.sh
+fi;
+if [ -e $ROOTFS_PKG ]; then
+  sed -i 's/UPDATE_ROOTFS="false"/UPDATE_ROOTFS="true"/g' setup.sh
+fi;
+if [ -e $APP_PKG ]; then
+  sed -i 's/UPDATE_APP="false"/UPDATE_APP="true"/g' setup.sh
+fi;
+
+echo -n $SUPPORTED_DEVICES > supported_devices
+
+#build update file
+message "Packaging files"
+tar cvf update.tar setup.sh supported_devices
+[ -f update-splash.gz ]     && tar -rf update.tar update-splash.gz
+[ -f update-terminated.gz ] && tar -rf update.tar update-terminated.gz
+[ -f update-error.gz ] 		&& tar -rf update.tar update-error.gz
+[ -f $KERNEL_PKG ]          && tar -rf update.tar $KERNEL_PKG
+[ -f $UBOOT_PKG ]           && tar -rf update.tar $UBOOT_PKG
+[ -f $ROOTFS_PKG ]          && tar -rf update.tar $ROOTFS_PKG
+[ -f $APP_PKG ]             && tar -rf update.tar $APP_PKG
+
+cat update.tar | openssl enc -aes-256-cbc -pass pass:$PASSWORD > update.tar.enc
+rm update.tar
+cat fat.bin update.tar.enc > payload
+SUM=$(md5sum payload | awk '{print $1;}')
+echo -n eGF1$SUM > header
+cat header payload > update.eup
+cp update.eup $DEST/update.eup
+cd ..
 
 cp $IMAGES/logo-updating.bmp $DEST/logo.bmp
 
@@ -216,6 +268,5 @@ echo -e '\E[1;33mVersions: '
 [ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
 [ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
 [ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
-[ $update_nand = 1 ] && echo 'WID     WID0510_'$dt_version
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
