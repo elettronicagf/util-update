@@ -340,7 +340,7 @@ if [ "$UPDATE_ROOTFS" = "true" ]; then
 		message "Installing rootfs update -> $dest_rootfs_partition"
 
 		message "Formatting ubi rootfs partition"
-		ubiformat $dest_rootfs_partition
+		ubiformat --yes $dest_rootfs_partition
 		if [ $? -ne 0 ]; then
 			message "Formatting ubi rootfs partition failed. Retrying..."
 			ubiformat $dest_rootfs_partition
@@ -395,7 +395,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 	if [ "$type" = "nand" ]; then 
 		#NAND
 		message "Formatting ubi app partition"
-		ubiformat $dest_app_partition
+		ubiformat --yes $dest_app_partition
 		if [ $? -ne 0 ]; then
 			message "Formatting ubi app partition failed. Retrying..."
 			ubiformat $dest_app_partition
