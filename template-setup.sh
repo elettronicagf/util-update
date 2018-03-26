@@ -450,6 +450,9 @@ fi
 # Show "update terminated" splash screen
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
 
+umount /dev/mmcblk*
+umount /dev/sd*
+
 exit 0
 
 
