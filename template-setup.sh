@@ -338,41 +338,15 @@ if [ "$UPDATE_ROOTFS" = "true" ]; then
 	if [ "$type" = "nand" ]; then 
 		#NAND
 		message "Installing rootfs update -> $dest_rootfs_partition"
-
-		message "Formatting ubi rootfs partition"
-		ubiformat --yes $dest_rootfs_partition
+		UBISIZE=$( tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -tv  --occurrence=1 rootfs.ubi | awk '{print $3}')
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
 		if [ $? -ne 0 ]; then
-			message "Formatting ubi rootfs partition failed. Retrying..."
-			ubiformat $dest_rootfs_partition
+			message "Writing ubi rootfs partition failed. Retrying..."
+			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
 			if [ $? -ne 0 ]; then
-				error_handler "Failed formatting ubi rootfs partition"
+				error_handler "Failed extracting and writing rootfs"
 			fi
 		fi
-		
-		message "Attaching ubi rootfs partition"
-		rootfs_part_no=${dest_rootfs_partition#/dev/mtd}
-		ubiattach /dev/ubi_ctrl -m $rootfs_part_no -d 0
-		if [ $? -ne 0 ]; then
-			error_handler "Failed attaching ubi rootfs partition"
-		fi
-		
-		message "Creating ubi rootfs volume"
-		ubimkvol /dev/ubi0 -N rootfs -m
-		if [ $? -ne 0 ]; then
-			error_handler "Failed creating ubi rootfs volume"
-		fi
-		
-		message "Mounting ubi rootfs volume"
-		mkdir -p /run/media/ubi-rootfs
-		mount -t ubifs -o defaults,noatime,rw,sync ubi0:rootfs /run/media/ubi-rootfs
-
-		message "Extracting and writing rootfs. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.tar.bz2 | tar -xmj -C /run/media/ubi-rootfs
-		if [ $? -ne 0 ]; then
-			error_handler "Failed extracting and writing rootfs"
-		fi
-		
-		umount /run/media/ubi-rootfs
 		message "Rootfs written successfully..."
 	else
 		#eMMC or SDCARD
