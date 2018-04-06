@@ -91,8 +91,20 @@ else
 	dest_app_dir=/home/root
 fi
 
+#Orientation is related to accelerometer, not display
+accelerometer_orientation=$(/usr/bin/accelerometerOrientation)
+message "Accelerometer orientation is: $accelerometer_orientation"
+
 # Show "updating" splash screen
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
+case $accelerometer_orientation in
+	"Portrait Up" | "Portrait Down" | "Landscape Left" | "Landscape Right")
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
+		;;
+	*)
+		message "Orientation error"
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
+		;;
+esac
 
 message "Check update compatibility"
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C / supported_devices
@@ -422,7 +434,15 @@ if [ "$UPDATE_APP" = "true" ]; then
 fi
 
 # Show "update terminated" splash screen
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
+case $accelerometer_orientation in
+	"Portrait Up" | "Portrait Down" | "Landscape Left" | "Landscape Right")
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
+		;;
+	*)
+		message "Orientation error"
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
+		;;
+esac
 
 umount /dev/mmcblk*
 umount /dev/sd*
