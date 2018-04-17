@@ -32,10 +32,9 @@ skipuboot=0
 skipspl=0
 skipkernel=0
 skiprootfs=0
-update_nand=0
 
-# ./create-update.sh --makepartition --nand 
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --help]" 1>&2; exit 1; }
+# ./create-update.sh --makepartition
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -46,7 +45,7 @@ error() {
 	echo " "	
 }
 
-TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,nand,dt:,cpu:,help -- "$@")
+TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,help -- "$@")
 [ $? -eq 1 ] && exit
 
 eval set -- "$TEMP"
@@ -59,19 +58,11 @@ do
         --no-kernel )     skipkernel=1; shift;;
         --no-rootfs )     skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
-        --nand )          update_nand=1; shift;;
         --help )          usage; shift;;
 	    -- )              shift; break;;
 		* )               break;
     esac
 done
-
-if [ $update_nand = 1 ]; then
-	if [ $skippartitioning = 0 ]; then
-		error "Error: option 'makepartition' is incompatible with option 'nand'"
-		exit
-	fi
-fi	
 
 #create dirs
 rm -rf $DEST
@@ -174,10 +165,7 @@ fi
 if [ $skiprootfs = 0 ]; then
 	message "Adding rootfs"
 	#update rootfs
-	if [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi ]; then
-		ROOTFS_PKG=rootfs.ubi
-		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.ubi $OUTPUT/$ROOTFS_PKG
-	elif [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 ]; then
+	if [ -f $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 ]; then
 		cp $ROOTFS_BINARIES/$YOCTO_IMAGE.tar.bz2 $OUTPUT/$ROOTFS_PKG
     else
 		message "rootfs not found"
@@ -192,11 +180,6 @@ cd $OUTPUT
 if [ $skippartitioning = 0 ]; then
 	sed -i 's/mkfs=0/mkfs=1/g' setup.sh
 fi
-
-if [ $update_nand = 1 ]; then
-	sed -i 's/type=emmc/type=nand/g' setup.sh
-fi
-
 
 mkdir tmp
 cd tmp
@@ -222,7 +205,7 @@ losetup -d $FIRST_AVAILABLE_LOOP_DEV
 cd ..
 mv tmp/fat.bin .
 sync
-#rm -rf tmp
+rm -rf tmp
 
 #update zip password
 sed -i 's/PASSWORD=""/PASSWORD='"'"$PASSWORD"'"'/g' setup.sh
@@ -267,8 +250,8 @@ cd ..
 cp $IMAGES/logo-itema-updating.bmp $DEST/logo.bmp
 
 #cleanup
-#rm -rf ./tmp
-#rm -rf ./output
+rm -rf ./tmp
+rm -rf ./output
 
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'

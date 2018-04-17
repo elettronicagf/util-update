@@ -33,21 +33,6 @@ get_wid_from_cmdline() {
 	echo $WID;
 }
 
-# Write file to NAND Flash and verify
-# $1 is destination partition, eg /dev/mtd0
-# $2 is the path of the file to write
-write_file_to_nand_and_verify() {
-	local ret=0
-	FILE_SIZE=$(stat -c "%s" $2)
-	flash_erase $1 0 0
-	nandwrite -p $1 $2
-	dd if=$1 of=temp.bak bs=$FILE_SIZE count=1 &>/dev/null
-	cmp temp.bak $2
-	ret=$?
-	rm temp.bak
-	return $ret
-}
-
 if [ "$#" -ne 1 ]; then
   error_handler "Usage ./template-setup.py <update file path>"
 fi;
@@ -69,21 +54,9 @@ message "Update path is $UPDATE_PATH"
 if [ $type = emmc ]; then
 	message "Updating EMMC"
 	dest_dev=mmcblk2
-elif [ $type = sdcard ]; then
-	message "Updating SDCARD"
-	dest_dev=mmcblk0
-elif [ $type = nand ]; then
-	message "Updating NAND"
 fi
 
-if [ $type = nand ]; then
-	mtd_spl=/dev/mtd4
-	mtd_uboot=/dev/mtd5
-	dest_kernel_partition=/dev/mtd0
-	dest_dtb_partition=/dev/mtd1
-	dest_rootfs_partition=/dev/mtd2
-	dest_app_partition=/dev/mtd3
-else
+if [ $type = emmc ]; then
 	mtd_spl=/dev/mtd0
 	mtd_uboot=/dev/mtd1
 	dest_boot_partition=/run/media/$dest_dev'p1'
@@ -303,46 +276,19 @@ if [ "$UPDATE_KERNEL" = "true" ]; then
 	if [ ! -e /kernel/$kernel_dt_file ]; then
 		error_handler "Invalid kernel update. Missing $kernel_dt_file dtb file!"
 	fi;
-	
-	message "Update type is $type"
-	if [ "$type" = "nand" ]; then 
-		#NAND
-	
-		#Update Kernel
-		message "Writing $kernel_image_file"
-		write_file_to_nand_and_verify $dest_kernel_partition /kernel/$kernel_image_file
-		if [ $? -ne 0 ]; then
-			message "Kernel installation on NAND Flash failed. Retrying..."
-			write_file_to_nand_and_verify $dest_kernel_partition /kernel/$kernel_image_file
-			if [ $? -ne 0 ]; then
-				error_handler "Kernel update installation on NAND Flash failed"
-			fi
-		fi
-		
-		#Update dtb
-		message "Writing $kernel_dt_file"
-		write_file_to_nand_and_verify $dest_dtb_partition /kernel/$kernel_dt_file
-		if [ $? -ne 0 ]; then
-			message "DTB installation on NAND Flash failed. Retrying..."
-			write_file_to_nand_and_verify $dest_dtb_partition /kernel/$kernel_dt_file
-			if [ $? -ne 0 ]; then
-				error_handler "DTB update installation on NAND Flash failed"
-			fi
-		fi
 
-	else
-		#eMMC or SDCARD
-		message "Installing kernel update -> $dest_boot_partition"
+	#eMMC
+	message "Installing kernel update -> $dest_boot_partition"
+	cp /kernel/* $dest_boot_partition
+	if [ $? -ne 0 ]; then
+		message "Kernel installation failed. Retrying..."
 		cp /kernel/* $dest_boot_partition
 		if [ $? -ne 0 ]; then
-			message "Kernel installation failed. Retrying..."
-			cp /kernel/* $dest_boot_partition
-			if [ $? -ne 0 ]; then
-				error_handler "Kernel update installation on eMMC/SD failed"
-			fi
+			error_handler "Kernel update installation on eMMC/SD failed"
 		fi
-		umount $dest_boot_partition
 	fi
+	umount $dest_boot_partition
+
 	message "Successfully updated kernel and dtbs"
 fi
 
@@ -351,29 +297,14 @@ fi
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_ROOTFS" = "true" ]; then
-	if [ "$type" = "nand" ]; then 
-		#NAND
-		message "Installing rootfs update -> $dest_rootfs_partition"
-		UBISIZE=$( tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -tv  --occurrence=1 rootfs.ubi | awk '{print $3}')
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
-		if [ $? -ne 0 ]; then
-			message "Writing ubi rootfs partition failed. Retrying..."
-			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
-			if [ $? -ne 0 ]; then
-				error_handler "Failed extracting and writing rootfs"
-			fi
-		fi
-		message "Rootfs written successfully..."
-	else
-		#eMMC or SDCARD
-		message "Extracting and writing rootfs. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.tar.bz2 | tar -xmj -C $dest_rootfs_partition		
-		if [ $? -ne 0 ]; then
-			error_handler "Failed extracting and writing rootfs"
-		fi
-		#umount $dest_rootfs_partition
-		message "Rootfs written successfully..."
+	#eMMC
+	message "Extracting and writing rootfs. This may take several minutes..."
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.tar.bz2 | tar -xmj -C $dest_rootfs_partition		
+	if [ $? -ne 0 ]; then
+		error_handler "Failed extracting and writing rootfs"
 	fi
+	#umount $dest_rootfs_partition
+	message "Rootfs written successfully..."
 fi
 
 #---------------------------------------------------------------------------------------------------------------
@@ -382,64 +313,25 @@ fi
 
 if [ "$UPDATE_APP" = "true" ]; then
 	message "Installing application -> $dest_app_partition"
-	if [ "$type" = "nand" ]; then 
-		#NAND
-		message "Formatting ubi app partition"
-		ubiformat --yes $dest_app_partition
-		if [ $? -ne 0 ]; then
-			message "Formatting ubi app partition failed. Retrying..."
-			ubiformat $dest_app_partition
-			if [ $? -ne 0 ]; then
-				error_handler "Failed formatting ubi app partition"
-			fi
-		fi
 
-		message "Attaching ubi app partition"
-		app_part_no=${dest_app_partition#/dev/mtd}
-		ubiattach /dev/ubi_ctrl -m $app_part_no -d 1
-		if [ $? -ne 0 ]; then
-			error_handler "Failed attaching ubi app partition"
-		fi	
+	#eMMC
+	umount "$dest_app_partition"
+	app_dev=${dest_app_partition#/run/media/}
+	mount /dev/$app_dev "$dest_rootfs_partition"/home/root/
 	
-		message "Creating ubi app volume"
-		ubimkvol /dev/ubi1 -N app -m
-		if [ $? -ne 0 ]; then
-			error_handler "Failed creating ubi app volume"
-		fi
-
-		message "Mounting ubi app volume"
-		mkdir -p /run/media/home/
-		mount -t ubifs ubi1:app /run/media/home/
-		
-		message "Extracting and writing app data. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C /run/media/home
-		if [ $? -ne 0 ]; then
-			error_handler "Failed extracting and writing app data"
-		fi
-		
-		umount /run/media/home
-		message "Application written successfully..."
-	else	
-		#eMMC/SDCARD
-
-		umount "$dest_app_partition"
-		app_dev=${dest_app_partition#/run/media/}
-		mount /dev/$app_dev "$dest_rootfs_partition"/home/root/
-		
-		#app_dev=${dest_app_partition#/run/media/}
-		#mount /dev/$app_dev $dest_app_partition
-		app_dir="$dest_rootfs_partition"
-		if [ ! -e "$app_dir" ]; then
-			error_handler "Failed extracting and writing app data, unable to find $dest_rootfs_partition directory in rootfs"
-		fi
-		message "Extracting and writing app data. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C "$app_dir"
-		if [ $? -ne 0 ]; then
-			error_handler "Failed extracting and writing app data"
-		fi
-		umount /dev/$app_dev
-		message "Application written successfully..."
-	fi	
+	#app_dev=${dest_app_partition#/run/media/}
+	#mount /dev/$app_dev $dest_app_partition
+	app_dir="$dest_rootfs_partition"
+	if [ ! -e "$app_dir" ]; then
+		error_handler "Failed extracting and writing app data, unable to find $dest_rootfs_partition directory in rootfs"
+	fi
+	message "Extracting and writing app data. This may take several minutes..."
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C "$app_dir"
+	if [ $? -ne 0 ]; then
+		error_handler "Failed extracting and writing app data"
+	fi
+	umount /dev/$app_dev
+	message "Application written successfully..."
 fi
 
 #only emmc
