@@ -83,28 +83,17 @@ if [ $type = nand ]; then
 	dest_rootfs_partition=/dev/mtd2
 	dest_app_partition=/dev/mtd3
 else
-	mtd_spl=/dev/mtd4
-	mtd_uboot=/dev/mtd5
+	mtd_spl=/dev/mtd0
+	mtd_uboot=/dev/mtd1
 	dest_boot_partition=/run/media/$dest_dev'p1'
 	dest_rootfs_partition=/run/media/$dest_dev'p2'
 	dest_app_partition=/run/media/$dest_dev'p2'
 	dest_app_dir=/home/root
 fi
 
-#Orientation is related to accelerometer, not display
-accelerometer_orientation=$(/usr/bin/accelerometerOrientation)
-message "Accelerometer orientation is: $accelerometer_orientation"
 
-# Show "updating" splash screen
-case $accelerometer_orientation in
-	"Portrait Up" | "Portrait Down" | "Landscape Left" | "Landscape Right")
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
-		;;
-	*)
-		message "Orientation error"
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
-		;;
-esac
+
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
 
 message "Check update compatibility"
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C / supported_devices
@@ -433,16 +422,10 @@ if [ "$UPDATE_APP" = "true" ]; then
 	fi
 fi
 
-# Show "update terminated" splash screen
-case $accelerometer_orientation in
-	"Portrait Up" | "Portrait Down" | "Landscape Left" | "Landscape Right")
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
-		;;
-	*)
-		message "Orientation error"
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
-		;;
-esac
+
+
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
+
 
 umount /dev/mmcblk*
 umount /dev/sd*
