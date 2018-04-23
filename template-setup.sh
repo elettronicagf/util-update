@@ -136,7 +136,7 @@ if [ $mkfs = 1 ]; then
     fi
     
     message "Formatting '$dest_dev'p2..."
-	mkfs.ext4 /dev/$dest_dev'p2'
+	mkfs.ext4 -F /dev/$dest_dev'p2'
     if [ $? -ne 0 ]; then 
         umount /dev/$dest_dev'p2'
         mkfs.ext4 /dev/$dest_dev'p2'
