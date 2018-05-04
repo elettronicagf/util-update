@@ -158,6 +158,9 @@ if [ $skipkernel = 0 ]; then
 	
 	tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb logo-itema.bmp
 	cd $HOME
+else
+	#no kernel update, move application package to output
+	[ -e $APP_BINARIES/$APP_PKG ] && cp $APP_BINARIES/$APP_PKG $OUTPUT/$APP_PKG
 fi
 
 #build rootfs update
