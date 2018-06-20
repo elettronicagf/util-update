@@ -132,6 +132,8 @@ if [ $mkfs = 1 ]; then
     
 	udevadm trigger --action=add
 	udevadm settle --timeout=10
+	#remount vfat without sync, it's faster
+	mount -o remount /dev/mmcblk2p1 /run/media/mmcblk2p1/
 fi
 fi #type!=nand
 
