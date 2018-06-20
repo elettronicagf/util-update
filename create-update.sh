@@ -3,11 +3,11 @@
 PASSWORD='47382e)9[xh?'
 SUPPORTED_DEVICES='0508'
 
-UBOOT_VERSION=0508-014
+UBOOT_VERSION=0508-015
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=0508-010
+KERNEL_VERSION=0508-011
 ROOTFS_VERSION=2.2
-ROOTFSLIVE_VERSION=0508-009
+ROOTFSLIVE_VERSION=0508-010
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -263,5 +263,6 @@ echo -e '\E[1;33mVersions: '
 [ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
 [ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
 [ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
+[ -e $APP_BINARIES/$APP_PKG ] && echo 'Application package included'
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
