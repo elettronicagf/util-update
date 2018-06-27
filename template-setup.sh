@@ -87,8 +87,8 @@ else
 	mtd_uboot=/dev/mtd1
 	dest_boot_partition=/run/media/$dest_dev'p1'
 	dest_rootfs_partition=/run/media/$dest_dev'p2'
-	dest_app_partition=/run/media/$dest_dev'p2'
-	dest_app_dir=/home/root
+	dest_app_partition=/run/media/$dest_dev'p3'
+	dest_app_dir=''
 fi
 
 
@@ -422,7 +422,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 		mount /dev/$app_dev $dest_app_partition
 		app_dir="$dest_app_partition""$dest_app_dir"
 		if [ ! -e "$app_dir" ]; then
-			error_handler "Failed extracting and writing app data, unable to find /home/root directory in rootfs"
+			error_handler "Failed extracting and writing app data, unable to find app directory in rootfs"
 		fi
 		message "Extracting and writing app data. This may take several minutes..."
 		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C "$app_dir"
