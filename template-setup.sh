@@ -112,13 +112,18 @@ message "Update compatibility validated"
 if [ $type!=nand ]; then
 #----------------------
 #eMMC partitioning:
-#Disk /dev/mmcblk2: , 3909091328 bytes
-#4 heads, 16 sectors/track, 119296 cylinders
-#Units = cylinders of 64 * 512 = 32768 bytes
-#
-#   Device Boot      Start         End      Blocks   Id  System
-#/dev/sdd1            2048       43007       20480    c  W95 FAT32 (LBA)
-#/dev/sdd2           43008     2140159     1048576   83  Linux
+#Disk /dev/mmcblk2: 3.7 GiB, 3909091328 bytes, 7634944 sectors
+#Units: sectors of 1 * 512 = 512 bytes
+#Sector size (logical/physical): 512 bytes / 512 bytes
+#I/O size (minimum/optimal): 512 bytes / 512 bytes
+#Disklabel type: dos
+#Disk identifier: 0x273f9840
+
+#Device         Boot   Start     End Sectors  Size Id Type
+#/dev/mmcblk2p1         2048   43007   40960   20M  c W95 FAT32 (LBA)
+#/dev/mmcblk2p2        43008 1091583 1048576  512M 83 Linux
+#/dev/mmcblk2p3      1091584 7634943 6543360  3.1G 83 Linux
+
 #----------------------
 if [ $mkfs = 1 ]; then
 	message "Partitioning $dest_dev..."
@@ -126,7 +131,7 @@ if [ $mkfs = 1 ]; then
 	
 	sleep 6
 	
-	echo -e "d\n3\nd\n2\nd\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n\nw\n" | fdisk /dev/$dest_dev
+	echo -e "d\n3\nd\n2\nd\nn\np\n1\n\n+20M\nt\n0c\nn\np\n2\n\n+512M\nn\np\n3\n\n\nw\n" | fdisk /dev/$dest_dev
 
 	message "Formatting '$dest_dev'p1..."
 	mkfs.vfat /dev/$dest_dev'p1'
@@ -139,7 +144,14 @@ if [ $mkfs = 1 ]; then
 	mkfs.ext4 -F /dev/$dest_dev'p2'
     if [ $? -ne 0 ]; then 
         umount /dev/$dest_dev'p2'
-        mkfs.ext4 /dev/$dest_dev'p2'
+        mkfs.ext4 -F /dev/$dest_dev'p2'
+    fi
+    
+    message "Formatting '$dest_dev'p3..."
+	mkfs.ext4 -F /dev/$dest_dev'p3'
+    if [ $? -ne 0 ]; then 
+        umount /dev/$dest_dev'p3'
+        mkfs.ext4 -F /dev/$dest_dev'p3'
     fi
     
 	udevadm trigger --action=add
