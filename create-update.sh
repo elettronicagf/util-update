@@ -23,6 +23,11 @@ ROOTFS_BINARIES=$HOME/binaries/rootfs
 APP_PKG=app.tar.gz
 APP_BINARIES=$HOME/binaries/app
 
+MBU_FW_UPDATE_TOOL=wbs_console
+MBU_FW_UPDATE_PKG=EM9280Bc.cef
+MBU_FW_BINARIES=$HOME/binaries/mbugrf-fw
+MBU_FW_PKG=mbufw.tar.gz
+
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
 YOCTO_IMAGE=0510mbugrfimx6-$ROOTFS_VERSION
@@ -32,6 +37,7 @@ skipuboot=0
 skipspl=0
 skipkernel=0
 skiprootfs=0
+skipmbufwupdate=0
 update_nand=0
 
 # ./create-update.sh --makepartition --nand 
@@ -94,13 +100,28 @@ rm setup.sh 1>/dev/null 2>&1
 #--------------------------------------------------------------------------------------------------------
 #graphics
 message "Building graphics"
-avconv  -i $IMAGES/logo-updating.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash.bin 1>/dev/null 2>&1
-gzip < tmp/update-splash.bin > $OUTPUT/update-splash.gz
-avconv  -i $IMAGES/logo-update-terminated.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated.bin 1>/dev/null 2>&1
-gzip < tmp/update-terminated.bin > $OUTPUT/update-terminated.gz
-avconv  -i $IMAGES/logo-update-error.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-error.bin 1>/dev/null 2>&1
-gzip < tmp/update-error.bin > $OUTPUT/update-error.gz
-
+avconv  -i $IMAGES/validatingUpgrade.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/validatingUpgrade.bin 1>/dev/null 2>&1
+gzip < tmp/validatingUpgrade.bin > $OUTPUT/validatingUpgrade.gz
+avconv  -i $IMAGES/firstPage.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/firstPage.bin 1>/dev/null 2>&1
+gzip < tmp/firstPage.bin > $OUTPUT/firstPage.gz
+avconv  -i $IMAGES/startUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/startUpdating.bin 1>/dev/null 2>&1
+gzip < tmp/startUpdating.bin > $OUTPUT/startUpdating.gz
+avconv  -i $IMAGES/formattingEMMC.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/formattingEMMC.bin 1>/dev/null 2>&1
+gzip < tmp/formattingEMMC.bin > $OUTPUT/formattingEMMC.gz
+avconv  -i $IMAGES/updatingBootloader.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingBootloader.bin 1>/dev/null 2>&1
+gzip < tmp/updatingBootloader.bin > $OUTPUT/updatingBootloader.gz
+avconv  -i $IMAGES/updatingKernel.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingKernel.bin 1>/dev/null 2>&1
+gzip < tmp/updatingKernel.bin > $OUTPUT/updatingKernel.gz
+avconv  -i $IMAGES/updatingRootfs.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingRootfs.bin 1>/dev/null 2>&1
+gzip < tmp/updatingRootfs.bin > $OUTPUT/updatingRootfs.gz
+avconv  -i $IMAGES/updatingApplication.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingApplication.bin 1>/dev/null 2>&1
+gzip < tmp/updatingApplication.bin > $OUTPUT/updatingApplication.gz
+avconv  -i $IMAGES/updatingFirmware.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingFirmware.bin 1>/dev/null 2>&1
+gzip < tmp/updatingFirmware.bin > $OUTPUT/updatingFirmware.gz
+avconv  -i $IMAGES/upgradeCompleted.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/upgradeCompleted.bin 1>/dev/null 2>&1
+gzip < tmp/upgradeCompleted.bin > $OUTPUT/upgradeCompleted.gz
+avconv  -i $IMAGES/errorUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/errorUpdating.bin 1>/dev/null 2>&1
+gzip < tmp/errorUpdating.bin > $OUTPUT/errorUpdating.gz
 cp template-setup.sh $OUTPUT/setup.sh
 
 #build u-boot+SPL update
@@ -122,6 +143,24 @@ if [[ $skipspl = 0 || $skipuboot = 0 ]]; then
 	tar czvf $OUTPUT/$UBOOT_PKG *
 fi
 cd ..
+
+
+if [ $skipmbufwupdate = 0 ]; then
+	message "Adding mbu fw and utilities"
+
+	if [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL ] || [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ]; then
+		message "Missing FW update tool or fw update file. Skipping mbu fw update"
+		skipmbufwupdate=1
+	else
+		message "Adding mbu fw update files"
+		cd tmp
+		rm ./* 1>/dev/null 2>&1
+		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL .
+		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG .
+		tar czvf $OUTPUT/$MBU_FW_PKG $MBU_FW_UPDATE_TOOL $MBU_FW_UPDATE_PKG
+		cd ..
+	fi
+fi
 
 
 #build kernel update
@@ -232,19 +271,34 @@ fi;
 if [ -e $APP_PKG ]; then
   sed -i 's/UPDATE_APP="false"/UPDATE_APP="true"/g' setup.sh
 fi;
+if [ -e $MBU_FW_PKG ]; then
+  sed -i 's/UPDATE_MBUGRF_FW="false"/UPDATE_MBUGRF_FW="true"/g' setup.sh
+  sed -i 's/WBS_APP=""/WBS_APP='$MBU_FW_UPDATE_TOOL'/g' setup.sh
+  sed -i 's/MBU_FW=""/MBU_FW='$MBU_FW_UPDATE_PKG'/g' setup.sh
+fi;
 
 echo -n $SUPPORTED_DEVICES > supported_devices
 
 #build update file
 message "Packaging files"
 tar cvf update.tar setup.sh supported_devices
-[ -f update-splash.gz ]     && tar -rf update.tar update-splash.gz
-[ -f update-terminated.gz ] && tar -rf update.tar update-terminated.gz
-[ -f update-error.gz ] 		&& tar -rf update.tar update-error.gz
+
+[ -f firstPage.gz ]     	&& tar -rf update.tar firstPage.gz
+[ -f validatingUpgrade.gz ] && tar -rf update.tar validatingUpgrade.gz
+[ -f startUpdating.gz ] 	&& tar -rf update.tar startUpdating.gz
+[ -f formattingEMMC.gz ] 	&& tar -rf update.tar formattingEMMC.gz
+[ -f updatingBootloader.gz ] && tar -rf update.tar updatingBootloader.gz
+[ -f updatingKernel.gz ] && tar -rf update.tar updatingKernel.gz
+[ -f updatingRootfs.gz ] && tar -rf update.tar updatingRootfs.gz
+[ -f updatingApplication.gz ] && tar -rf update.tar updatingApplication.gz
+[ -f updatingFirmware.gz ] && tar -rf update.tar updatingFirmware.gz
+[ -f upgradeCompleted.gz ] && tar -rf update.tar upgradeCompleted.gz
+[ -f errorUpdating.gz ] && tar -rf update.tar errorUpdating.gz
 [ -f $KERNEL_PKG ]          && tar -rf update.tar $KERNEL_PKG
 [ -f $UBOOT_PKG ]           && tar -rf update.tar $UBOOT_PKG
 [ -f $ROOTFS_PKG ]          && tar -rf update.tar $ROOTFS_PKG
 [ -f $APP_PKG ]             && tar -rf update.tar $APP_PKG
+[ -f $MBU_FW_PKG ]          && tar -rf update.tar $MBU_FW_PKG
 
 cat update.tar | openssl enc -aes-256-cbc -pass pass:$PASSWORD > update.tar.enc
 rm update.tar
@@ -268,5 +322,6 @@ echo -e '\E[1;33mVersions: '
 [ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
 [ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
 [ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
+[ $skipmbufwupdate = 0 ]  && echo 'MBU FW will be programmed. Version ' $MBU_FW_UPDATE_PKG
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;

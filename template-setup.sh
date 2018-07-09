@@ -3,7 +3,10 @@ UPDATE_UBOOT="false"
 UPDATE_KERNEL="false"
 UPDATE_ROOTFS="false"
 UPDATE_APP="false"
-
+UPDATE_MBUGRF_FW="false"
+WBS_APP=""
+MBU_FW=""
+MOUNT_POINT_APP=/run/media/mmcblk2p3
 
 message() {
 	echo "##### $1 #####"
@@ -16,7 +19,7 @@ message() {
 error_handler() {
 	message "##### Error: $1 #####"
 	# Show "update error" splash screen
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-error.gz | zcat > /dev/fb0
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 errorUpdating.gz | zcat > /dev/fb0
 	exit 1;
 }
 
@@ -92,8 +95,7 @@ else
 fi
 
 
-
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 validatingUpgrade.gz | zcat > /dev/fb0
 
 message "Check update compatibility"
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C / supported_devices
@@ -105,6 +107,48 @@ if [ $? -ne 0 ]; then
 fi
 
 message "Update compatibility validated"
+
+#---------------------------------------------------------------------------------------------------------------
+# Show Initial Page with countdown
+#---------------------------------------------------------------------------------------------------------------
+if [ "$UPDATE_MBUGRF_FW" = "true" ] || [ "$UPDATE_APP" = "true" ]; then
+
+	echo 1 > /sys/class/leds/LED-1/brightness
+
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz --occurrence=1 -C / version.ini
+
+	SD_ONBOARD_VER=$(cat $MOUNT_POINT_APP/version.ini | grep SDRel | awk -F'=' '{print $2}')
+	SD_UPDATE_VER=$(cat /version.ini | grep -i SDRel | awk -F'=' '{print $2}')
+	echo "SD ONBOARD: " $SD_ONBOARD_VER
+	echo "UPDATE: " $SD_UPDATE_VER
+	if [ -z "$SD_ONBOARD_VER" ]; then
+		SD_ONBOARD_VER="NONE"
+	fi
+	if [ -z "$SD_UPDATE_VER" ]; then
+		SD_UPDATE_VER="NONE"
+	fi
+
+	message "Extracting mbugrf fw update"
+    mkdir /mbufw
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /mbufw mbufw.tar.gz 
+	if [ $? -ne 0 ]; then
+		error_handler "Error while unpacking mbugrf fw update from update package"
+	fi
+	
+	#unpack u-boot update
+	tar xmf /mbufw/mbufw.tar.gz -C /mbufw 
+	if [ $? -ne 0 ]; then
+		error_handler "Error while extracting mbugrf fw update files"
+	fi
+
+
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 firstPage.gz | zcat > /dev/fb0
+
+	/mbufw/$WBS_APP /dev/ttymxc1  /mbufw/$MBU_FW "$SD_ONBOARD_VER" "$SD_UPDATE_VER "
+	
+fi
+
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 startUpdating.gz | zcat > /dev/fb0
 
 #---------------------------------------------------------------------------------------------------------------
 # Partitioning
@@ -126,6 +170,9 @@ if [ $type!=nand ]; then
 
 #----------------------
 if [ $mkfs = 1 ]; then
+
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 formattingEMMC.gz | zcat > /dev/fb0
+
 	message "Partitioning $dest_dev..."
 	umount /dev/$dest_dev'p'*
 	
@@ -163,6 +210,7 @@ fi #type!=nand
 # Bootloader
 #---------------------------------------------------------------------------------------------------------------
 if [ "$UPDATE_UBOOT" = "true" ]; then
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingBootloader.gz | zcat > /dev/fb0
 	message "Extracting bootloader update"
     #extracting bootloader update from update package
     mkdir /uboot
@@ -277,6 +325,7 @@ fi
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_KERNEL" = "true" ]; then
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingKernel.gz | zcat > /dev/fb0
 	message "Extracting kernel update"
     #extracting kernel update from update package
     mkdir /kernel
@@ -348,6 +397,7 @@ fi
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_ROOTFS" = "true" ]; then
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingRootfs.gz | zcat > /dev/fb0
 	if [ "$type" = "nand" ]; then 
 		#NAND
 		message "Installing rootfs update -> $dest_rootfs_partition"
@@ -378,6 +428,7 @@ fi
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_APP" = "true" ]; then
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingApplication.gz | zcat > /dev/fb0
 	message "Installing application -> $dest_app_partition"
 	if [ "$type" = "nand" ]; then 
 		#NAND
@@ -434,9 +485,17 @@ if [ "$UPDATE_APP" = "true" ]; then
 	fi
 fi
 
+#---------------------------------------------------------------------------------------------------------------
+# MBU FW
+#---------------------------------------------------------------------------------------------------------------
 
+if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingFirmware.gz | zcat > /dev/fb0
+	echo 0 > /sys/class/leds/LED-1/brightness
+	/mbufw/$WBS_APP /dev/ttymxc1  a /mbufw/$MBU_FW
+fi
 
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 upgradeCompleted.gz | zcat > /dev/fb0
 
 
 umount /dev/mmcblk*
