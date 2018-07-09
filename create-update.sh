@@ -194,6 +194,10 @@ if [ $skipkernel = 0 ]; then
 		cp $APP_PKG $OUTPUT/$APP_PKG
 		cd ..
 		rm -rf tmp
+	else
+		cd $APP_BINARIES
+		cp $APP_PKG $OUTPUT/$APP_PKG
+		cd ..
 	fi
 	
 	#update kernel
@@ -247,7 +251,7 @@ if [ -f $KERNEL_LIVE_BINARIES/zImage ]; then
 else
     error "Live image not found"
 fi
-cp $HOME/images/logo-boot.bmp mnt/logo.bmp
+
 umount $FIRST_AVAILABLE_LOOP_DEV'p1'
 losetup -d $FIRST_AVAILABLE_LOOP_DEV
 cd ..
@@ -309,11 +313,10 @@ cat header payload > update.eup
 cp update.eup $DEST/update.eup
 cd ..
 
-cp $IMAGES/logo-updating.bmp $DEST/logo.bmp
 
 #cleanup
 rm -rf ./tmp
-rm -rf ./output
+#rm -rf ./output
 
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
