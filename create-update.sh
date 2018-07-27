@@ -316,7 +316,7 @@ cd ..
 
 #cleanup
 rm -rf ./tmp
-#rm -rf ./output
+rm -rf ./output
 
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
