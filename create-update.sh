@@ -6,7 +6,8 @@ SUPPORTED_DEVICES='MBUGRFiMX6'
 UBOOT_VERSION=MBUGRFiMX6-001
 SPL_VERSION=$UBOOT_VERSION
 KERNEL_VERSION=MBUGRFiMX6-002
-ROOTFS_VERSION=1.0
+ROOTFS_VERSION_LIGHT=1.0
+ROOTFS_VERSION_FULL=1.0
 ROOTFSLIVE_VERSION=MBUGRFiMX6-002
 
 HOME=$(pwd)
@@ -20,17 +21,20 @@ KERNEL_BINARIES=$HOME/binaries/kernel/$KERNEL_VERSION
 KERNEL_LIVE_BINARIES=$HOME/binaries/kernel/$ROOTFSLIVE_VERSION-live
 UBOOT_BINARIES=$HOME/binaries/u-boot
 ROOTFS_BINARIES=$HOME/binaries/rootfs
-APP_PKG=app.tar.gz
+APP_PKG_LIGHT=app-light.tar.gz
+APP_PKG_FULL=app-full.tar.gz
 APP_BINARIES=$HOME/binaries/app
 
 MBU_FW_UPDATE_TOOL=wbs_console
-MBU_FW_UPDATE_PKG=EM9280Bc.cef
+MBU_FW_UPDATE_PKG_LIGHT=EM9280Bc.cef
+MBU_FW_UPDATE_PKG_FULL=EM9280xx.cef
 MBU_FW_BINARIES=$HOME/binaries/mbugrf-fw
 MBU_FW_PKG=mbufw.tar.gz
 
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
-YOCTO_IMAGE=0510mbugrfimx6-$ROOTFS_VERSION
+YOCTO_IMAGE_LIGHT=0510mbugrfimx6-$ROOTFS_VERSION_LIGHT
+YOCTO_IMAGE_FULL=0510mbugrf-full-$ROOTFS_VERSION_FULL
 
 skippartitioning=1
 skipuboot=0
@@ -38,10 +42,11 @@ skipspl=0
 skipkernel=0
 skiprootfs=0
 skipmbufwupdate=0
-update_nand=0
+mbuversion_full=0
+mbuversion_light=0
 
 # ./create-update.sh --makepartition --nand 
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --nand | --help]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --mbugrf-full | --mbugrf-light | --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -52,7 +57,7 @@ error() {
 	echo " "	
 }
 
-TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,nand,dt:,cpu:,help -- "$@")
+TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,mbugrf-full,mbugrf-light,help -- "$@")
 [ $? -eq 1 ] && exit
 
 eval set -- "$TEMP"
@@ -65,19 +70,13 @@ do
         --no-kernel )     skipkernel=1; shift;;
         --no-rootfs )     skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
-        --nand )          update_nand=1; shift;;
+        --mbugrf-full )   mbuversion_full=1; shift;;
+        --mbugrf-light )  mbuversion_light=1; shift;;        
         --help )          usage; shift;;
 	    -- )              shift; break;;
 		* )               break;
     esac
 done
-
-if [ $update_nand = 1 ]; then
-	if [ $skippartitioning = 0 ]; then
-		error "Error: option 'makepartition' is incompatible with option 'nand'"
-		exit
-	fi
-fi	
 
 #create dirs
 rm -rf $DEST
@@ -93,6 +92,20 @@ mkdir tmp
 rm ./*.tar 1>/dev/null 2>&1
 rm ./*.gz 1>/dev/null 2>&1
 rm setup.sh 1>/dev/null 2>&1
+
+#setup mbugrf version
+if [ $mbuversion_full = 1 ]; then
+	skipmbufwupdate=1
+	MBU_FW_UPDATE_PKG=$MBU_FW_UPDATE_PKG_FULL
+	YOCTO_IMAGE=$YOCTO_IMAGE_FULL
+	APP_PKG=$APP_PKG_FULL
+	ROOTFS_VERSION=$ROOTFS_VERSION_FULL
+elif [ $mbuversion_light = 1 ]; then
+	MBU_FW_UPDATE_PKG=$MBU_FW_UPDATE_PKG_LIGHT
+	YOCTO_IMAGE=$YOCTO_IMAGE_LIGHT
+	APP_PKG=$APP_PKG_LIGHT
+	ROOTFS_VERSION=$ROOTFS_VERSION_LIGHT
+fi	
 
 #--------------------------------------------------------------------------------------------------------
 #create your own graphics
@@ -147,7 +160,7 @@ cd ..
 
 if [ $skipmbufwupdate = 0 ]; then
 	message "Adding mbu fw and utilities"
-
+	
 	if [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL ] || [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ]; then
 		message "Missing FW update tool or fw update file. Skipping mbu fw update"
 		skipmbufwupdate=1
@@ -156,8 +169,8 @@ if [ $skipmbufwupdate = 0 ]; then
 		cd tmp
 		rm ./* 1>/dev/null 2>&1
 		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL .
-		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG .
-		tar czvf $OUTPUT/$MBU_FW_PKG $MBU_FW_UPDATE_TOOL $MBU_FW_UPDATE_PKG
+		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ./mbufw.tar.gz
+		tar czvf $OUTPUT/$MBU_FW_PKG $MBU_FW_UPDATE_TOOL mbufw.tar.gz
 		cd ..
 	fi
 fi
@@ -191,12 +204,12 @@ if [ $skipkernel = 0 ]; then
 		tar rf $APP_TAR_NAME modules
 		rm -rf modules
 		gzip $APP_TAR_NAME
-		cp $APP_PKG $OUTPUT/$APP_PKG
+		cp $APP_PKG $OUTPUT/app.tar.gz
 		cd ..
 		rm -rf tmp
 	else
 		cd $APP_BINARIES
-		cp $APP_PKG $OUTPUT/$APP_PKG
+		cp $APP_PKG $OUTPUT/app.tar.gz
 		cd ..
 	fi
 	
@@ -227,11 +240,6 @@ cd $OUTPUT
 if [ $skippartitioning = 0 ]; then
 	sed -i 's/mkfs=0/mkfs=1/g' setup.sh
 fi
-
-if [ $update_nand = 1 ]; then
-	sed -i 's/type=emmc/type=nand/g' setup.sh
-fi
-
 
 mkdir tmp
 cd tmp
@@ -321,6 +329,8 @@ rm -rf ./output
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
 echo -e '\E[1;33mVersions: '
+[ $mbuversion_full = 1 ]  && echo 'MBUGRF FULL'
+[ $mbuversion_light = 1 ] && echo 'MBUGRF LIGHT'
 [ $skipuboot = 0 ]   && echo 'U-Boot ' $UBOOT_VERSION
 [ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
 [ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
