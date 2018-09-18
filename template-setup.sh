@@ -469,9 +469,10 @@ if [ "$UPDATE_APP" = "true" ]; then
 		message "Application written successfully..."
 	else
 		#eMMC/SDCARD
-		app_dev=${dest_app_partition#/run/media/}
-		mount /dev/$app_dev $dest_app_partition
-		app_dir="$dest_app_partition""$dest_app_dir"
+		app_dev=${dest_app_partition#/run/media/}		
+		mount /dev/$app_dev "$dest_rootfs_partition"/home/root/		
+		
+		app_dir="$dest_rootfs_partition"
 		if [ ! -e "$app_dir" ]; then
 			error_handler "Failed extracting and writing app data, unable to find app directory in rootfs"
 		fi
@@ -480,7 +481,8 @@ if [ "$UPDATE_APP" = "true" ]; then
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing app data"
 		fi
-		umount $dest_app_partition
+
+		umount /dev/$app_dev
 		message "Application written successfully..."
 	fi
 fi
