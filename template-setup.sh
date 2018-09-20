@@ -88,6 +88,7 @@ if [ $type = nand ]; then
 else
 	mtd_spl=/dev/mtd0
 	mtd_uboot=/dev/mtd1
+	mtd_uboot_env=/dev/mtd3
 	dest_boot_partition=/run/media/$dest_dev'p1'
 	dest_rootfs_partition=/run/media/$dest_dev'p2'
 	dest_app_partition=/run/media/$dest_dev'p3'
@@ -311,6 +312,8 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 				fi
 			fi
 		fi
+		message "Resetting U-Boot environment"
+		flash_erase $mtd_uboot_env
 		flash_lock $mtd_uboot
 	fi
 
