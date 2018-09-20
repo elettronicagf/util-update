@@ -5,7 +5,7 @@ SUPPORTED_DEVICES='MBUGRFiMX6'
 
 UBOOT_VERSION=MBUGRFiMX6-002
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=MBUGRFiMX6-002
+KERNEL_VERSION=MBUGRFiMX6-003
 ROOTFS_VERSION_LIGHT=1.0
 ROOTFS_VERSION_FULL=2.0
 ROOTFSLIVE_VERSION=MBUGRFiMX6-002
@@ -280,7 +280,7 @@ fi;
 if [ -e $ROOTFS_PKG ]; then
   sed -i 's/UPDATE_ROOTFS="false"/UPDATE_ROOTFS="true"/g' setup.sh
 fi;
-if [ -e $APP_PKG ]; then
+if [ -e app.tar.gz ]; then
   sed -i 's/UPDATE_APP="false"/UPDATE_APP="true"/g' setup.sh
 fi;
 if [ -e $MBU_FW_PKG ]; then
@@ -295,21 +295,21 @@ echo -n $SUPPORTED_DEVICES > supported_devices
 message "Packaging files"
 tar cvf update.tar setup.sh supported_devices
 
-[ -f firstPage.gz ]     	&& tar -rf update.tar firstPage.gz
-[ -f validatingUpgrade.gz ] && tar -rf update.tar validatingUpgrade.gz
-[ -f startUpdating.gz ] 	&& tar -rf update.tar startUpdating.gz
-[ -f formattingEMMC.gz ] 	&& tar -rf update.tar formattingEMMC.gz
+[ -f firstPage.gz ]     	 && tar -rf update.tar firstPage.gz
+[ -f validatingUpgrade.gz ]  && tar -rf update.tar validatingUpgrade.gz
+[ -f startUpdating.gz ] 	 && tar -rf update.tar startUpdating.gz
+[ -f formattingEMMC.gz ] 	 && tar -rf update.tar formattingEMMC.gz
 [ -f updatingBootloader.gz ] && tar -rf update.tar updatingBootloader.gz
-[ -f updatingKernel.gz ] && tar -rf update.tar updatingKernel.gz
-[ -f updatingRootfs.gz ] && tar -rf update.tar updatingRootfs.gz
+[ -f updatingKernel.gz ]     && tar -rf update.tar updatingKernel.gz
+[ -f updatingRootfs.gz ]     && tar -rf update.tar updatingRootfs.gz
 [ -f updatingApplication.gz ] && tar -rf update.tar updatingApplication.gz
-[ -f updatingFirmware.gz ] && tar -rf update.tar updatingFirmware.gz
-[ -f upgradeCompleted.gz ] && tar -rf update.tar upgradeCompleted.gz
-[ -f errorUpdating.gz ] && tar -rf update.tar errorUpdating.gz
+[ -f updatingFirmware.gz ]  && tar -rf update.tar updatingFirmware.gz
+[ -f upgradeCompleted.gz ]  && tar -rf update.tar upgradeCompleted.gz
+[ -f errorUpdating.gz ]     && tar -rf update.tar errorUpdating.gz
 [ -f $KERNEL_PKG ]          && tar -rf update.tar $KERNEL_PKG
 [ -f $UBOOT_PKG ]           && tar -rf update.tar $UBOOT_PKG
 [ -f $ROOTFS_PKG ]          && tar -rf update.tar $ROOTFS_PKG
-[ -f $APP_PKG ]             && tar -rf update.tar $APP_PKG
+[ -f app.tar.gz ]           && tar -rf update.tar app.tar.gz
 [ -f $MBU_FW_PKG ]          && tar -rf update.tar $MBU_FW_PKG
 
 cat update.tar | openssl enc -aes-256-cbc -pass pass:$PASSWORD > update.tar.enc

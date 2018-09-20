@@ -111,7 +111,7 @@ message "Update compatibility validated"
 #---------------------------------------------------------------------------------------------------------------
 # Show Initial Page with countdown
 #---------------------------------------------------------------------------------------------------------------
-if [ "$UPDATE_MBUGRF_FW" = "true" ] || [ "$UPDATE_APP" = "true" ]; then
+if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
 
 	echo 1 > /sys/class/leds/LED-1/brightness
 
@@ -418,7 +418,7 @@ if [ "$UPDATE_ROOTFS" = "true" ]; then
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing rootfs"
 		fi
-		umount $dest_rootfs_partition
+		#umount $dest_rootfs_partition
 		message "Rootfs written successfully..."
 	fi
 fi
