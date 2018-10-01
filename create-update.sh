@@ -5,7 +5,7 @@ SUPPORTED_DEVICES='MBUGRFiMX6'
 
 UBOOT_VERSION=MBUGRFiMX6-002
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=MBUGRFiMX6-003
+KERNEL_VERSION=MBUGRFiMX6-006
 ROOTFS_VERSION_LIGHT=3.0
 ROOTFS_VERSION_FULL=3.0
 ROOTFSLIVE_VERSION=MBUGRFiMX6-002
@@ -21,13 +21,14 @@ KERNEL_BINARIES=$HOME/binaries/kernel/$KERNEL_VERSION
 KERNEL_LIVE_BINARIES=$HOME/binaries/kernel/$ROOTFSLIVE_VERSION-live
 UBOOT_BINARIES=$HOME/binaries/u-boot
 ROOTFS_BINARIES=$HOME/binaries/rootfs
-APP_PKG_LIGHT=app-light.tar.gz
-APP_PKG_FULL=app-full.tar.gz
+#APP_PKG_LIGHT=app-light.tar.gz
+#APP_PKG_FULL=app-full.tar.gz
+APP_PKG=noapp
 APP_BINARIES=$HOME/binaries/app
 
-MBU_FW_UPDATE_TOOL=wbs_console
-MBU_FW_UPDATE_PKG_LIGHT=EM9280Bc.cef
-MBU_FW_UPDATE_PKG_FULL=EM9280xx.cef
+MBU_FW_UPDATE_TOOL=wbs_console_1.2
+#MBU_FW_UPDATE_PKG_LIGHT=EM9280Bc.cef
+#MBU_FW_UPDATE_PKG_FULL=EM9280xx.cef
 MBU_FW_BINARIES=$HOME/binaries/mbugrf-fw
 MBU_FW_PKG=mbufw.tar.gz
 
@@ -41,12 +42,11 @@ skipuboot=0
 skipspl=0
 skipkernel=0
 skiprootfs=0
-skipmbufwupdate=0
-mbuversion_full=0
-mbuversion_light=0
+#skipmbufwupdate=0
+#mbuversion_full=1
+#mbuversion_light=0
 
-# ./create-update.sh --makepartition --nand 
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --mbugrf-full | --mbugrf-light | --help]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --fwpkg=filename-cef | --apppkg=filename-tar-gz | --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -57,7 +57,7 @@ error() {
 	echo " "	
 }
 
-TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,mbugrf-full,mbugrf-light,help -- "$@")
+TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,fwpkg:,apppkg:,help -- "$@")
 [ $? -eq 1 ] && exit
 
 eval set -- "$TEMP"
@@ -70,8 +70,8 @@ do
         --no-kernel )     skipkernel=1; shift;;
         --no-rootfs )     skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
-        --mbugrf-full )   mbuversion_full=1; shift;;
-        --mbugrf-light )  mbuversion_light=1; shift;;        
+        --fwpkg )   	  MBU_FW_UPDATE_PKG=$2; shift 2;;
+        --apppkg )  	  APP_PKG=$2; shift 2;;        
         --help )          usage; shift;;
 	    -- )              shift; break;;
 		* )               break;
@@ -93,19 +93,9 @@ rm ./*.tar 1>/dev/null 2>&1
 rm ./*.gz 1>/dev/null 2>&1
 rm setup.sh 1>/dev/null 2>&1
 
-#setup mbugrf version
-if [ $mbuversion_full = 1 ]; then
-	skipmbufwupdate=1
-	MBU_FW_UPDATE_PKG=$MBU_FW_UPDATE_PKG_FULL
-	YOCTO_IMAGE=$YOCTO_IMAGE_FULL
-	APP_PKG=$APP_PKG_FULL
-	ROOTFS_VERSION=$ROOTFS_VERSION_FULL
-elif [ $mbuversion_light = 1 ]; then
-	MBU_FW_UPDATE_PKG=$MBU_FW_UPDATE_PKG_LIGHT
-	YOCTO_IMAGE=$YOCTO_IMAGE_LIGHT
-	APP_PKG=$APP_PKG_LIGHT
-	ROOTFS_VERSION=$ROOTFS_VERSION_LIGHT
-fi	
+
+YOCTO_IMAGE=$YOCTO_IMAGE_FULL
+ROOTFS_VERSION=$ROOTFS_VERSION_FULL
 
 #--------------------------------------------------------------------------------------------------------
 #create your own graphics
@@ -158,7 +148,7 @@ fi
 cd ..
 
 
-if [ $skipmbufwupdate = 0 ]; then
+if [ -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ]; then
 	message "Adding mbu fw and utilities"
 	
 	if [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL ] || [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ]; then
@@ -169,8 +159,8 @@ if [ $skipmbufwupdate = 0 ]; then
 		cd tmp
 		rm ./* 1>/dev/null 2>&1
 		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL .
-		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ./mbufw.tar.gz
-		tar czvf $OUTPUT/$MBU_FW_PKG $MBU_FW_UPDATE_TOOL mbufw.tar.gz
+		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG .
+		tar czvf $OUTPUT/$MBU_FW_PKG $MBU_FW_UPDATE_TOOL $MBU_FW_UPDATE_PKG
 		cd ..
 	fi
 fi
@@ -180,43 +170,46 @@ fi
 #-------------------
 if [ $skipkernel = 0 ]; then
 	message "Adding kernel"
-    filename_modules=$KERNEL_BINARIES/$MODULES_FILE
+    #filename_modules=$KERNEL_BINARIES/$MODULES_FILE
     
-	if [ -e $filename_modules ]; then
-		message "Adding modules"
+	#if [ -e $filename_modules ]; then
+		#message "Adding modules"
 		
-		cd $APP_BINARIES
-		mkdir tmp
-		cd tmp
-		mkdir modules
-		cd modules
-		sudo tar xf $filename_modules .
-		cd ..
-		APP_TAR_NAME=${APP_PKG%.gz}
-		if [ ! -e $APP_BINARIES/$APP_PKG ]; then
-			touch test
-			tar cvf $APP_TAR_NAME test
-			tar --delete -f $APP_TAR_NAME test
-		else
-			gunzip -c $APP_BINARIES/$APP_PKG > $APP_TAR_NAME
-		fi
-		sudo chown -R root:root $APP_BINARIES/tmp/*
-		tar rf $APP_TAR_NAME modules
-		rm -rf modules
-		gzip $APP_TAR_NAME
-		cp $APP_PKG $OUTPUT/app.tar.gz
-		cd ..
-		rm -rf tmp
-	else
-		cd $APP_BINARIES
-		cp $APP_PKG $OUTPUT/app.tar.gz
-		cd ..
-	fi
+		#cd $APP_BINARIES
+		#mkdir tmp
+		#cd tmp
+		#mkdir modules
+		#cd modules
+		#sudo tar xf $filename_modules .
+		#cd ..
+		#APP_TAR_NAME=${APP_PKG%.gz}
+		#if [ ! -e $APP_BINARIES/$APP_PKG ]; then
+			#touch test
+			#tar cvf $APP_TAR_NAME test
+			#tar --delete -f $APP_TAR_NAME test
+		#else
+			#gunzip -c $APP_BINARIES/$APP_PKG > $APP_TAR_NAME
+		#fi
+		#sudo chown -R root:root $APP_BINARIES/tmp/*
+		#tar rf $APP_TAR_NAME modules
+		#rm -rf modules
+		#gzip $APP_TAR_NAME
+		#cp $APP_PKG $OUTPUT/app.tar.gz
+		#cd ..
+		#rm -rf tmp
+	#fi
 	
 	#update kernel
 	cd $KERNEL_BINARIES
 	tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
 	cd $HOME
+fi
+
+if [ -e $APP_BINARIES/$APP_PKG ]; then
+	message "Adding application"
+	cd $APP_BINARIES
+	cp $APP_PKG $OUTPUT/app.tar.gz
+	cd ..
 fi
 
 #build rootfs update
@@ -321,20 +314,18 @@ cat header payload > update.eup
 cp update.eup $DEST/update.eup
 cd ..
 
+echo
+echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
+echo -e '\E[1;33mVersions: '
+[ -f $OUTPUT/$UBOOT_PKG ]   && echo 'U-Boot ' $UBOOT_VERSION
+[ -f $OUTPUT/$UBOOT_PKG ]   && echo 'SPL    ' $SPL_VERSION
+[ -f $OUTPUT/$KERNEL_PKG ]  && echo 'Kernel ' $KERNEL_VERSION
+[ -f $OUTPUT/$ROOTFS_PKG ]  && echo 'Rootfs ' $ROOTFS_VERSION
+[ -f $OUTPUT/$MBU_FW_PKG ]  && echo 'MBU fw ' $MBU_FW_UPDATE_PKG
+[ -f $OUTPUT/app.tar.gz ]   && echo 'App    ' $APP_PKG
+echo
+[ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
 
 #cleanup
 rm -rf ./tmp
 rm -rf ./output
-
-echo
-echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
-echo -e '\E[1;33mVersions: '
-[ $mbuversion_full = 1 ]  && echo 'MBUGRF FULL'
-[ $mbuversion_light = 1 ] && echo 'MBUGRF LIGHT'
-[ $skipuboot = 0 ]   && echo 'U-Boot ' $UBOOT_VERSION
-[ $skipspl = 0 ]     && echo 'SPL    ' $SPL_VERSION
-[ $skipkernel = 0 ]  && echo 'Kernel ' $KERNEL_VERSION
-[ $skiprootfs = 0 ]  && echo 'Rootfs ' $ROOTFS_VERSION
-[ $skipmbufwupdate = 0 ]  && echo 'MBU FW will be programmed. Version ' $MBU_FW_UPDATE_PKG
-echo
-[ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
