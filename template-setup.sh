@@ -145,6 +145,7 @@ if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
 
 	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 firstPage.gz | zcat > /dev/fb0
 
+	sleep 5
 	/mbufw/$WBS_APP /dev/ttymxc1  /mbufw/$MBU_FW "$SD_ONBOARD_VER" "$SD_UPDATE_VER "
 	
 fi
@@ -496,8 +497,9 @@ fi
 
 if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
 	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingFirmware.gz | zcat > /dev/fb0
-	echo 0 > /sys/class/leds/LED-1/brightness
+	sleep 5
 	/mbufw/$WBS_APP /dev/ttymxc1  a /mbufw/$MBU_FW
+	sleep 3
 fi
 
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 upgradeCompleted.gz | zcat > /dev/fb0
