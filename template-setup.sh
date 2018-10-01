@@ -314,7 +314,7 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 			fi
 		fi
 		message "Resetting U-Boot environment"
-		flash_erase $mtd_uboot_env
+		flash_erase $mtd_uboot_env 0 0
 		flash_lock $mtd_uboot
 	fi
 
