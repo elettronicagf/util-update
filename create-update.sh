@@ -29,7 +29,7 @@ APP_BINARIES=$HOME/binaries/app
 MBU_FW_UPDATE_TOOL=wbs_console_1.2
 #MBU_FW_UPDATE_PKG_LIGHT=EM9280Bc.cef
 #MBU_FW_UPDATE_PKG_FULL=EM9280xx.cef
-MBU_FW_BINARIES=$HOME/binaries/mbugrf-fw
+MBU_FW_BINARIES=$HOME/binaries/mbu-fw
 MBU_FW_PKG=mbufw.tar.gz
 
 MODULES_FILE=modules_$KERNEL_VERSION.tgz

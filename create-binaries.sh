@@ -3,7 +3,7 @@ cd binaries
 
 mkdir rootfs
 mkdir app
-mkdir mbugrf-fw
+mkdir mbu-fw
 
 ln -s ../../kernel/binaries/ kernel
 ln -s ../../u-boot/binaries/ u-boot
@@ -11,3 +11,4 @@ ln -s ../../u-boot/binaries/ u-boot
 cd rootfs
 ln -s /data2/developer/yocto_rootfs/0510mbugrfimx6-full-1.0.tar.bz2 .
 ln -s /data2/developer/yocto_rootfs/0510mbugrfimx6-full-2.0.tar.bz2 .
+ln -s /data2/developer/yocto_rootfs/0510mbugrfimx6-full-3.0.tar.bz2 .
