@@ -326,6 +326,17 @@ echo -e '\E[1;33mVersions: '
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
 
+#FABBRY: genera file version.txt
+echo -e 'Versions: '  						>> $DEST/version.txt
+[ -f $OUTPUT/$UBOOT_PKG ]   && echo 'U-Boot ' $UBOOT_VERSION	>> $DEST/version.txt
+[ -f $OUTPUT/$UBOOT_PKG ]   && echo 'SPL    ' $SPL_VERSION	>> $DEST/version.txt
+[ -f $OUTPUT/$KERNEL_PKG ]  && echo 'Kernel ' $KERNEL_VERSION	>> $DEST/version.txt
+[ -f $OUTPUT/$ROOTFS_PKG ]  && echo 'Rootfs ' $ROOTFS_VERSION	>> $DEST/version.txt
+[ -f $OUTPUT/$MBU_FW_PKG ]  && echo 'MBU fw ' $MBU_FW_UPDATE_PKG >> $DEST/version.txt	
+[ -f $OUTPUT/app.tar.gz ]   && echo 'App    ' $APP_PKG		>> $DEST/version.txt
+echo
+[ $skippartitioning = 0 ] && echo -e 'Partitions will be formatted !!!' >> $DEST/version.txt
+
 #cleanup
 rm -rf ./tmp
 rm -rf ./output
