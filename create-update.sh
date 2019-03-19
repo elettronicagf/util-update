@@ -84,11 +84,20 @@ rm setup.sh 1>/dev/null 2>&1
 #--------------------------------------------------------------------------------------------------------
 #graphics
 message "Building graphics"
-avconv  -i $IMAGES/logo-updating.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash.bin 1>/dev/null 2>&1
-gzip < tmp/update-splash.bin > $OUTPUT/update-splash.gz
-avconv  -i $IMAGES/logo-update-terminated.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated.bin 1>/dev/null 2>&1
-gzip < tmp/update-terminated.bin > $OUTPUT/update-terminated.gz
 #cp images/logo-boot.bmp $OUTPUT/logo.bmp
+avconv  -i $IMAGES/logo-updating-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1024x600.bin 1>/dev/null 2>&1
+gzip < tmp/update-splash-1024x600.bin > $OUTPUT/update-splash-1024x600.gz
+avconv  -i $IMAGES/logo-update-terminated-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1024x600.bin 1>/dev/null 2>&1
+gzip < tmp/update-terminated-1024x600.bin > $OUTPUT/update-terminated-1024x600.gz
+avconv  -i $IMAGES/logo-boot-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1280x800.bin 1>/dev/null 2>&1
+gzip < tmp/update-splash-1280x800.bin > $OUTPUT/update-splash-1280x800.gz
+avconv  -i $IMAGES/logo-update-terminated-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1280x800.bin 1>/dev/null 2>&1
+gzip < tmp/update-terminated-1280x800.bin > $OUTPUT/update-terminated-1280x800.gz
+avconv  -i $IMAGES/logo-updating-800x480.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-800x480.bin 1>/dev/null 2>&1
+gzip < tmp/update-splash-800x480.bin > $OUTPUT/update-splash-800x480.gz
+avconv  -i $IMAGES/logo-update-terminated-800x480.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-800x480.bin 1>/dev/null 2>&1
+gzip < tmp/update-terminated-800x480.bin > $OUTPUT/update-terminated-800x480.gz
+
 
 #build u-boot+SPL update
 #-------------------
@@ -162,8 +171,12 @@ fi
 #build update file
 message "Packaging files"
 zip -0 $ZIP_PASSWORD $DEST/update.bin setup.sh
-[ -f update-splash.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-splash.gz
-[ -f update-terminated.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-terminated.gz
+[ -f update-splash-1024x600.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-splash-1024x600.gz
+[ -f update-terminated-1024x600.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-terminated-1024x600.gz
+[ -f update-splash-1280x800.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-splash-1280x800.gz
+[ -f update-terminated-1280x800.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-terminated-1280x800.gz
+[ -f update-splash-800x480.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-splash-800x480.gz
+[ -f update-terminated-800x480.gz ] && zip -0 $ZIP_PASSWORD $DEST/update.bin update-terminated-800x480.gz
 [ -f $KERNEL_PKG ] && zip -0 $ZIP_PASSWORD $DEST/update.bin $KERNEL_PKG
 [ -f $UBOOT_PKG ] && zip -0 $ZIP_PASSWORD $DEST/update.bin $UBOOT_PKG
 [ -f $ROOTFS_PKG ] && zip -0 $ZIP_PASSWORD $DEST/update2.bin $ROOTFS_PKG
@@ -177,7 +190,7 @@ else
     error "Live image not found"
 fi
 
-cp $IMAGES/logo-updating.bmp $DEST/logo.bmp
+cp $IMAGES/logo-boot* $DEST/
 
 #cleanup
 rm -rf ./tmp

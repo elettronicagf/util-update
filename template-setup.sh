@@ -63,10 +63,18 @@ bootmedia=/run/media/mmcblk0p1
 [ ! -z "$(mount | grep sda)" ] && bootmedia=/run/media/sda
 [ ! -z "$(mount | grep sda1)" ] && bootmedia=/run/media/sda1
 
+
+geometry=$(fbset | grep geometry)
+
+xres=$(echo $geometry | awk -F " " '{print $2}')
+yres=$(echo $geometry | awk -F " " '{print $3}')
+
+res=${xres}x${yres}
+
 cd $source
 
 #show splash screen
-zcat update-splash.gz > /dev/fb0
+zcat update-splash-$res.gz > /dev/fb0
 
 #----------------------
 # partizionamento emmc:
@@ -175,6 +183,6 @@ umount /dev/sda2
 umount /dev/$dest_dev'p'*
 
 #notify update is terminated
-zcat $source/update-terminated.gz > /dev/fb0
+zcat $source/update-terminated-$res.gz > /dev/fb0
 
 
