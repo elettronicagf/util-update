@@ -89,7 +89,7 @@ avconv  -i $IMAGES/logo-updating-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_
 gzip < tmp/update-splash-1024x600.bin > $OUTPUT/update-splash-1024x600.gz
 avconv  -i $IMAGES/logo-update-terminated-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1024x600.bin 1>/dev/null 2>&1
 gzip < tmp/update-terminated-1024x600.bin > $OUTPUT/update-terminated-1024x600.gz
-avconv  -i $IMAGES/logo-boot-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1280x800.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/logo-updating-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1280x800.bin 1>/dev/null 2>&1
 gzip < tmp/update-splash-1280x800.bin > $OUTPUT/update-splash-1280x800.gz
 avconv  -i $IMAGES/logo-update-terminated-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1280x800.bin 1>/dev/null 2>&1
 gzip < tmp/update-terminated-1280x800.bin > $OUTPUT/update-terminated-1280x800.gz
