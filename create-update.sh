@@ -90,27 +90,27 @@ rm setup.sh 1>/dev/null 2>&1
 #--------------------------------------------------------------------------------------------------------
 #graphics
 message "Building graphics"
-avconv  -i $IMAGES/validatingUpgrade.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/validatingUpgrade.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/validatingUpgrade.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/validatingUpgrade.bin 1>/dev/null 2>&1
 gzip < tmp/validatingUpgrade.bin > $OUTPUT/validatingUpgrade.gz
-avconv  -i $IMAGES/firstPage.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/firstPage.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/firstPage.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/firstPage.bin 1>/dev/null 2>&1
 gzip < tmp/firstPage.bin > $OUTPUT/firstPage.gz
-avconv  -i $IMAGES/startUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/startUpdating.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/startUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/startUpdating.bin 1>/dev/null 2>&1
 gzip < tmp/startUpdating.bin > $OUTPUT/startUpdating.gz
-avconv  -i $IMAGES/formattingEMMC.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/formattingEMMC.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/formattingEMMC.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/formattingEMMC.bin 1>/dev/null 2>&1
 gzip < tmp/formattingEMMC.bin > $OUTPUT/formattingEMMC.gz
-avconv  -i $IMAGES/updatingBootloader.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingBootloader.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/updatingBootloader.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/updatingBootloader.bin 1>/dev/null 2>&1
 gzip < tmp/updatingBootloader.bin > $OUTPUT/updatingBootloader.gz
-avconv  -i $IMAGES/updatingKernel.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingKernel.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/updatingKernel.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/updatingKernel.bin 1>/dev/null 2>&1
 gzip < tmp/updatingKernel.bin > $OUTPUT/updatingKernel.gz
-avconv  -i $IMAGES/updatingRootfs.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingRootfs.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/updatingRootfs.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/updatingRootfs.bin 1>/dev/null 2>&1
 gzip < tmp/updatingRootfs.bin > $OUTPUT/updatingRootfs.gz
-avconv  -i $IMAGES/updatingApplication.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingApplication.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/updatingApplication.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/updatingApplication.bin 1>/dev/null 2>&1
 gzip < tmp/updatingApplication.bin > $OUTPUT/updatingApplication.gz
-avconv  -i $IMAGES/updatingFirmware.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/updatingFirmware.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/updatingFirmware.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/updatingFirmware.bin 1>/dev/null 2>&1
 gzip < tmp/updatingFirmware.bin > $OUTPUT/updatingFirmware.gz
-avconv  -i $IMAGES/upgradeCompleted.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/upgradeCompleted.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/upgradeCompleted.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/upgradeCompleted.bin 1>/dev/null 2>&1
 gzip < tmp/upgradeCompleted.bin > $OUTPUT/upgradeCompleted.gz
-avconv  -i $IMAGES/errorUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/errorUpdating.bin 1>/dev/null 2>&1
+avconv  -i $IMAGES/errorUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb24 tmp/errorUpdating.bin 1>/dev/null 2>&1
 gzip < tmp/errorUpdating.bin > $OUTPUT/errorUpdating.gz
 cp template-setup.sh $OUTPUT/setup.sh
 
