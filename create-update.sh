@@ -1,14 +1,13 @@
 #!/bin/sh
 #set -x
 PASSWORD='12kjh8dfs[324'
-SUPPORTED_DEVICES='MBUGRFiMX6'
+SUPPORTED_DEVICES='SMGGRF'
 
-UBOOT_VERSION=MBUGRFiMX6-003
+UBOOT_VERSION=SMGGRF-001
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=MBUGRFiMX6-007
-ROOTFS_VERSION_LIGHT=3.0
-ROOTFS_VERSION_FULL=3.0
-ROOTFSLIVE_VERSION=MBUGRFiMX6-002
+KERNEL_VERSION=SMGGRF-001
+ROOTFS_VERSION=1.0
+ROOTFSLIVE_VERSION=SMGGRF-001
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -21,30 +20,22 @@ KERNEL_BINARIES=$HOME/binaries/kernel/$KERNEL_VERSION
 KERNEL_LIVE_BINARIES=$HOME/binaries/kernel/$ROOTFSLIVE_VERSION-live
 UBOOT_BINARIES=$HOME/binaries/u-boot
 ROOTFS_BINARIES=$HOME/binaries/rootfs
-#APP_PKG_LIGHT=app-light.tar.gz
-#APP_PKG_FULL=app-full.tar.gz
 APP_PKG=noapp
 APP_BINARIES=$HOME/binaries/app
 
 MBU_FW_UPDATE_TOOL=wbs_console_1.2
-#MBU_FW_UPDATE_PKG_LIGHT=EM9280Bc.cef
-#MBU_FW_UPDATE_PKG_FULL=EM9280xx.cef
 MBU_FW_BINARIES=$HOME/binaries/mbu-fw
 MBU_FW_PKG=mbufw.tar.gz
 
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
-YOCTO_IMAGE_LIGHT=0510mbugrfimx6-full-$ROOTFS_VERSION_LIGHT
-YOCTO_IMAGE_FULL=0510mbugrfimx6-full-$ROOTFS_VERSION_FULL
+YOCTO_IMAGE=0510smggrf-$ROOTFS_VERSION
 
 skippartitioning=1
 skipuboot=0
 skipspl=0
 skipkernel=0
 skiprootfs=0
-#skipmbufwupdate=0
-#mbuversion_full=1
-#mbuversion_light=0
 
 usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --fwpkg=filename-cef | --apppkg=filename-tar-gz | --help]" 1>&2; exit 1; }
 
@@ -70,7 +61,7 @@ do
         --no-kernel )     skipkernel=1; shift;;
         --no-rootfs )     skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
-        --fwpkg )   	  MBU_FW_UPDATE_PKG=$2; shift 2;;
+#        --fwpkg )   	  MBU_FW_UPDATE_PKG=$2; shift 2;;
         --apppkg )  	  APP_PKG=$2; shift 2;;        
         --help )          usage; shift;;
 	    -- )              shift; break;;
@@ -92,10 +83,6 @@ mkdir tmp
 rm ./*.tar 1>/dev/null 2>&1
 rm ./*.gz 1>/dev/null 2>&1
 rm setup.sh 1>/dev/null 2>&1
-
-
-YOCTO_IMAGE=$YOCTO_IMAGE_FULL
-ROOTFS_VERSION=$ROOTFS_VERSION_FULL
 
 #--------------------------------------------------------------------------------------------------------
 #create your own graphics
