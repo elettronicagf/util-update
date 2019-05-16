@@ -6,7 +6,7 @@ SUPPORTED_DEVICES='SMGGRF'
 UBOOT_VERSION=SMGGRF-001
 SPL_VERSION=$UBOOT_VERSION
 KERNEL_VERSION=SMGGRF-001
-ROOTFS_VERSION=1.0
+ROOTFS_VERSION=1.2
 ROOTFSLIVE_VERSION=SMGGRF-001
 
 HOME=$(pwd)
@@ -23,10 +23,6 @@ ROOTFS_BINARIES=$HOME/binaries/rootfs
 APP_PKG=noapp
 APP_BINARIES=$HOME/binaries/app
 
-MBU_FW_UPDATE_TOOL=wbs_console_1.2
-MBU_FW_BINARIES=$HOME/binaries/mbu-fw
-MBU_FW_PKG=mbufw.tar.gz
-
 MODULES_FILE=modules_$KERNEL_VERSION.tgz
 
 YOCTO_IMAGE=0510smggrf-$ROOTFS_VERSION
@@ -37,7 +33,7 @@ skipspl=0
 skipkernel=0
 skiprootfs=0
 
-usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --fwpkg=filename-cef | --apppkg=filename-tar-gz | --help]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [--no-uboot | --no-spl | --no-kernel | --no-rootfs | --makepartition | --apppkg=filename-tar-gz | --help]" 1>&2; exit 1; }
 
 message() {
 	echo -e '\E[1;33m'$1'\E[0m'	
@@ -48,7 +44,7 @@ error() {
 	echo " "	
 }
 
-TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,fwpkg:,apppkg:,help -- "$@")
+TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,apppkg:,help -- "$@")
 [ $? -eq 1 ] && exit
 
 eval set -- "$TEMP"
@@ -61,7 +57,6 @@ do
         --no-kernel )     skipkernel=1; shift;;
         --no-rootfs )     skiprootfs=1; shift;;
         --makepartition ) skippartitioning=0; shift;;
-#        --fwpkg )   	  MBU_FW_UPDATE_PKG=$2; shift 2;;
         --apppkg )  	  APP_PKG=$2; shift 2;;        
         --help )          usage; shift;;
 	    -- )              shift; break;;
@@ -83,6 +78,12 @@ mkdir tmp
 rm ./*.tar 1>/dev/null 2>&1
 rm ./*.gz 1>/dev/null 2>&1
 rm setup.sh 1>/dev/null 2>&1
+
+#pre-check
+if [ ! -f $APP_BINARIES/recovery.tar.bz2 ]; then
+	error "Recovery not found"
+	exit
+fi
 
 #--------------------------------------------------------------------------------------------------------
 #create your own graphics
@@ -135,24 +136,6 @@ fi
 cd ..
 
 
-if [ -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ]; then
-	message "Adding mbu fw and utilities"
-	
-	if [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL ] || [ ! -e $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG ]; then
-		message "Missing FW update tool or fw update file. Skipping mbu fw update"
-		skipmbufwupdate=1
-	else
-		message "Adding mbu fw update files"
-		cd tmp
-		rm ./* 1>/dev/null 2>&1
-		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_TOOL .
-		cp $MBU_FW_BINARIES/$MBU_FW_UPDATE_PKG .
-		tar czvf $OUTPUT/$MBU_FW_PKG $MBU_FW_UPDATE_TOOL $MBU_FW_UPDATE_PKG
-		cd ..
-	fi
-fi
-
-
 #build kernel update
 #-------------------
 if [ $skipkernel = 0 ]; then
@@ -195,7 +178,14 @@ fi
 if [ -e $APP_BINARIES/$APP_PKG ]; then
 	message "Adding application"
 	cd $APP_BINARIES
-	cp $APP_PKG $OUTPUT/app.tar.gz
+	cp $APP_PKG $OUTPUT/app.tar.bz2
+	cd ..
+fi
+
+if [ -e $APP_BINARIES/recovery.tar.bz2 ]; then
+	message "Adding Recovery"
+	cd $APP_BINARIES
+	cp $APP_BINARIES/recovery.tar.bz2 $OUTPUT
 	cd ..
 fi
 
@@ -260,13 +250,8 @@ fi;
 if [ -e $ROOTFS_PKG ]; then
   sed -i 's/UPDATE_ROOTFS="false"/UPDATE_ROOTFS="true"/g' setup.sh
 fi;
-if [ -e app.tar.gz ]; then
+if [ -e app.tar.bz2 ]; then
   sed -i 's/UPDATE_APP="false"/UPDATE_APP="true"/g' setup.sh
-fi;
-if [ -e $MBU_FW_PKG ]; then
-  sed -i 's/UPDATE_MBUGRF_FW="false"/UPDATE_MBUGRF_FW="true"/g' setup.sh
-  sed -i 's/WBS_APP=""/WBS_APP='$MBU_FW_UPDATE_TOOL'/g' setup.sh
-  sed -i 's/MBU_FW=""/MBU_FW='$MBU_FW_UPDATE_PKG'/g' setup.sh
 fi;
 
 echo -n $SUPPORTED_DEVICES > supported_devices
@@ -289,8 +274,8 @@ tar cvf update.tar setup.sh supported_devices
 [ -f $KERNEL_PKG ]          && tar -rf update.tar $KERNEL_PKG
 [ -f $UBOOT_PKG ]           && tar -rf update.tar $UBOOT_PKG
 [ -f $ROOTFS_PKG ]          && tar -rf update.tar $ROOTFS_PKG
-[ -f app.tar.gz ]           && tar -rf update.tar app.tar.gz
-[ -f $MBU_FW_PKG ]          && tar -rf update.tar $MBU_FW_PKG
+[ -f app.tar.bz2 ]           && tar -rf update.tar app.tar.bz2
+[ -f recovery.tar.bz2 ]      && tar -rf update.tar recovery.tar.bz2
 
 cat update.tar | openssl enc -aes-256-cbc -pass pass:$PASSWORD > update.tar.enc
 rm update.tar
@@ -308,19 +293,19 @@ echo -e '\E[1;33mVersions: '
 [ -f $OUTPUT/$UBOOT_PKG ]   && echo 'SPL    ' $SPL_VERSION
 [ -f $OUTPUT/$KERNEL_PKG ]  && echo 'Kernel ' $KERNEL_VERSION
 [ -f $OUTPUT/$ROOTFS_PKG ]  && echo 'Rootfs ' $ROOTFS_VERSION
-[ -f $OUTPUT/$MBU_FW_PKG ]  && echo 'MBU fw ' $MBU_FW_UPDATE_PKG
-[ -f $OUTPUT/app.tar.gz ]   && echo 'App    ' $APP_PKG
+[ -f $OUTPUT/app.tar.bz2 ]   && echo 'App    ' $APP_PKG
+[ -f $OUTPUT/recovery.tar.bz2 ] && echo 'Recovery added'
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
 
-#FABBRY: genera file version.txt
+#genera file version.txt
 echo -e 'Versions: '  						>> $DEST/version.txt
 [ -f $OUTPUT/$UBOOT_PKG ]   && echo 'U-Boot ' $UBOOT_VERSION	>> $DEST/version.txt
 [ -f $OUTPUT/$UBOOT_PKG ]   && echo 'SPL    ' $SPL_VERSION	>> $DEST/version.txt
 [ -f $OUTPUT/$KERNEL_PKG ]  && echo 'Kernel ' $KERNEL_VERSION	>> $DEST/version.txt
 [ -f $OUTPUT/$ROOTFS_PKG ]  && echo 'Rootfs ' $ROOTFS_VERSION	>> $DEST/version.txt
-[ -f $OUTPUT/$MBU_FW_PKG ]  && echo 'MBU fw ' $MBU_FW_UPDATE_PKG >> $DEST/version.txt	
-[ -f $OUTPUT/app.tar.gz ]   && echo 'App    ' $APP_PKG		>> $DEST/version.txt
+[ -f $OUTPUT/app.tar.bz2 ]   && echo 'App    ' $APP_PKG		>> $DEST/version.txt
+[ -f $OUTPUT/recovery.tar.bz2 ] && echo 'Recovery added' >> $DEST/version.txt
 echo
 [ $skippartitioning = 0 ] && echo -e 'Partitions will be formatted !!!' >> $DEST/version.txt
 

@@ -3,9 +3,6 @@ UPDATE_UBOOT="false"
 UPDATE_KERNEL="false"
 UPDATE_ROOTFS="false"
 UPDATE_APP="false"
-UPDATE_MBUGRF_FW="false"
-WBS_APP=""
-MBU_FW=""
 MOUNT_POINT_APP=/run/media/mmcblk2p3
 
 message() {
@@ -49,6 +46,24 @@ write_file_to_nand_and_verify() {
 	rm temp.bak
 	return $ret
 }
+
+# extract_file <file> <dest-path>
+extract_file() {
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -C $2 --occurrence=1 $1
+	return $?
+}
+
+#show_image <file.gz>
+show_image() {
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 $1 | zcat > /dev/fb0
+}
+
+#extract_bz2 <file.tar.bz2> <dest-path>
+extract_bz2() {
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 $1 | tar -xmj -C $2
+	return $?
+}
+
 
 if [ "$#" -ne 1 ]; then
   error_handler "Usage ./template-setup.py <update file path>"
@@ -95,8 +110,7 @@ else
 	dest_app_dir=''
 fi
 
-
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 validatingUpgrade.gz | zcat > /dev/fb0
+show_image validatingUpgrade.gz
 
 message "Check update compatibility"
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C / supported_devices
@@ -109,48 +123,7 @@ fi
 
 message "Update compatibility validated"
 
-#---------------------------------------------------------------------------------------------------------------
-# Show Initial Page with countdown
-#---------------------------------------------------------------------------------------------------------------
-if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
-
-	echo 1 > /sys/class/leds/LED-1/brightness
-
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz --occurrence=1 -C / version.ini
-
-	SD_ONBOARD_VER=$(cat $MOUNT_POINT_APP/version.ini | grep SDRel | awk -F'=' '{print $2}')
-	SD_UPDATE_VER=$(cat /version.ini | grep -i SDRel | awk -F'=' '{print $2}')
-	echo "SD ONBOARD: " $SD_ONBOARD_VER
-	echo "UPDATE: " $SD_UPDATE_VER
-	if [ -z "$SD_ONBOARD_VER" ]; then
-		SD_ONBOARD_VER="NONE"
-	fi
-	if [ -z "$SD_UPDATE_VER" ]; then
-		SD_UPDATE_VER="NONE"
-	fi
-
-	message "Extracting mbugrf fw update"
-    mkdir /mbufw
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /mbufw mbufw.tar.gz 
-	if [ $? -ne 0 ]; then
-		error_handler "Error while unpacking mbugrf fw update from update package"
-	fi
-	
-	#unpack u-boot update
-	tar xmf /mbufw/mbufw.tar.gz -C /mbufw 
-	if [ $? -ne 0 ]; then
-		error_handler "Error while extracting mbugrf fw update files"
-	fi
-
-
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 firstPage.gz | zcat > /dev/fb0
-
-	sleep 5
-	/mbufw/$WBS_APP /dev/ttymxc1  /mbufw/$MBU_FW "$SD_ONBOARD_VER" "$SD_UPDATE_VER "
-	
-fi
-
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 startUpdating.gz | zcat > /dev/fb0
+show_image startUpdating.gz
 
 #---------------------------------------------------------------------------------------------------------------
 # Partitioning
@@ -173,7 +146,7 @@ if [ $type!=nand ]; then
 #----------------------
 if [ $mkfs = 1 ]; then
 
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 formattingEMMC.gz | zcat > /dev/fb0
+	show_image formattingEMMC.gz
 
 	message "Partitioning $dest_dev..."
 	umount /dev/$dest_dev'p'*
@@ -212,17 +185,17 @@ fi #type!=nand
 # Bootloader
 #---------------------------------------------------------------------------------------------------------------
 if [ "$UPDATE_UBOOT" = "true" ]; then
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingBootloader.gz | zcat > /dev/fb0
+	show_image updatingBootloader.gz
 	message "Extracting bootloader update"
     #extracting bootloader update from update package
     mkdir /uboot
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /uboot uboot.tar.gz 
+    extract_file uboot.tar.gz /uboot
 	if [ $? -ne 0 ]; then
 		error_handler "Error while unpacking bootloader update from update package"
 	fi
 	
 	#unpack u-boot update
-	tar xmf /uboot/uboot.tar.gz -C /uboot 
+	tar xmf /uboot/uboot.tar.gz -C /uboot
 	if [ $? -ne 0 ]; then
 		error_handler "Error while extracting bootloader update files"
 	fi
@@ -332,17 +305,17 @@ fi
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_KERNEL" = "true" ]; then
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingKernel.gz | zcat > /dev/fb0
+	show_image updatingKernel.gz
 	message "Extracting kernel update"
     #extracting kernel update from update package
     mkdir /kernel
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /kernel kernel.tar.gz
+    extract_file kernel.tar.gz /kernel
 	if [ $? -ne 0 ]; then
 		error_handler "Error while unpacking kernel update from update package"
 	fi
 	
 	#unpack kernel update
-	tar xmf /kernel/kernel.tar.gz -C /kernel 
+	tar xmf /kernel/kernel.tar.gz -C /kernel
 	if [ $? -ne 0 ]; then
 		error_handler "Error while extracting kernel update files"
 	fi
@@ -404,7 +377,7 @@ fi
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_ROOTFS" = "true" ]; then
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingRootfs.gz | zcat > /dev/fb0
+	show_image updatingRootfs.gz
 	if [ "$type" = "nand" ]; then 
 		#NAND
 		message "Installing rootfs update -> $dest_rootfs_partition"
@@ -414,14 +387,14 @@ if [ "$UPDATE_ROOTFS" = "true" ]; then
 			message "Writing ubi rootfs partition failed. Retrying..."
 			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
 			if [ $? -ne 0 ]; then
-				error_handler "Failed extracting and writing rootfs"
+				error_handleextract_filer "Failed extracting and writing rootfs"
 			fi
 		fi
 		message "Rootfs written successfully..."
 	else
 		#eMMC or SDCARD
 		message "Extracting and writing rootfs. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.tar.bz2 | tar -xmj -C $dest_rootfs_partition		
+		extract_bz2 rootfs.tar.bz2 $dest_rootfs_partition
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing rootfs"
 		fi
@@ -431,11 +404,20 @@ if [ "$UPDATE_ROOTFS" = "true" ]; then
 fi
 
 #---------------------------------------------------------------------------------------------------------------
+# Recovery
+#---------------------------------------------------------------------------------------------------------------
+message "Extracting and writing Recovery utility"
+extract_bz2 recovery.tar.bz2 $dest_rootfs_partition
+if [ $? -ne 0 ]; then
+	error_handler "Failed extracting and writing Recovery"
+fi
+
+#---------------------------------------------------------------------------------------------------------------
 # App and Modules
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_APP" = "true" ]; then
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingApplication.gz | zcat > /dev/fb0
+	show_image updatingApplication.gz
 	message "Installing application -> $dest_app_partition"
 	if [ "$type" = "nand" ]; then 
 		#NAND
@@ -467,7 +449,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 		mount -t ubifs ubi1:app /run/media/home/
 		
 		message "Extracting and writing app data. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C /run/media/home
+		extract_bz2 app.tar.bz2 /run/media/home
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing app data"
 		fi
@@ -484,7 +466,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 			error_handler "Failed extracting and writing app data, unable to find app directory in rootfs"
 		fi
 		message "Extracting and writing app data. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C "$app_dir"
+		extract_bz2 app.tar.bz2 $app_dir
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing app data"
 		fi
@@ -494,19 +476,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 	fi
 fi
 
-#---------------------------------------------------------------------------------------------------------------
-# MBU FW
-#---------------------------------------------------------------------------------------------------------------
-
-if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingFirmware.gz | zcat > /dev/fb0
-	sleep 5
-	/mbufw/$WBS_APP /dev/ttymxc1  a /mbufw/$MBU_FW
-	sleep 3
-fi
-
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 upgradeCompleted.gz | zcat > /dev/fb0
-
+show_image upgradeCompleted.gz
 
 umount /dev/mmcblk*
 umount /dev/sd*
