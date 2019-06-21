@@ -3,11 +3,12 @@
 PASSWORD='12kjh8dfs[324'
 SUPPORTED_DEVICES='SMGGRF'
 
-UBOOT_VERSION=SMGGRF-002
+UBOOT_VERSION=SMGGRF-003
 SPL_VERSION=$UBOOT_VERSION
 KERNEL_VERSION=SMGGRF-002
 ROOTFS_VERSION=1.3
 ROOTFSLIVE_VERSION=SMGGRF-002
+RECOVER_VERSION=1.1
 
 HOME=$(pwd)
 OUTPUT=$HOME/output
@@ -80,7 +81,7 @@ rm ./*.gz 1>/dev/null 2>&1
 rm setup.sh 1>/dev/null 2>&1
 
 #pre-check
-if [ ! -f $APP_BINARIES/recovery.tar.bz2 ]; then
+if [ ! -f $APP_BINARIES/recover-$RECOVER_VERSION.tar.bz2 ]; then
 	error "Recovery not found"
 	exit
 fi
@@ -182,10 +183,10 @@ if [ -e $APP_BINARIES/$APP_PKG ]; then
 	cd ..
 fi
 
-if [ -e $APP_BINARIES/recovery.tar.bz2 ]; then
+if [ -e $APP_BINARIES/recover-$RECOVER_VERSION.tar.bz2 ]; then
 	message "Adding Recovery"
 	cd $APP_BINARIES
-	cp $APP_BINARIES/recovery.tar.bz2 $OUTPUT
+	cp $APP_BINARIES/recover-$RECOVER_VERSION.tar.bz2 $OUTPUT/recovery.tar.bz2
 	cd ..
 fi
 
@@ -289,12 +290,12 @@ cd ..
 echo
 echo -e '\E[1;37mUpdate package is stored in ./usb-key path'
 echo -e '\E[1;33mVersions: '
-[ -f $OUTPUT/$UBOOT_PKG ]   && echo 'U-Boot ' $UBOOT_VERSION
-[ -f $OUTPUT/$UBOOT_PKG ]   && echo 'SPL    ' $SPL_VERSION
-[ -f $OUTPUT/$KERNEL_PKG ]  && echo 'Kernel ' $KERNEL_VERSION
-[ -f $OUTPUT/$ROOTFS_PKG ]  && echo 'Rootfs ' $ROOTFS_VERSION
-[ -f $OUTPUT/app.tar.bz2 ]   && echo 'App    ' $APP_PKG
-[ -f $OUTPUT/recovery.tar.bz2 ] && echo 'Recovery added'
+[ -f $OUTPUT/$UBOOT_PKG ]       && echo 'U-Boot   '$UBOOT_VERSION
+[ -f $OUTPUT/$UBOOT_PKG ]       && echo 'SPL      '$SPL_VERSION
+[ -f $OUTPUT/$KERNEL_PKG ]      && echo 'Kernel   '$KERNEL_VERSION
+[ -f $OUTPUT/$ROOTFS_PKG ]      && echo 'Rootfs   '$ROOTFS_VERSION
+[ -f $OUTPUT/app.tar.bz2 ]      && echo 'App      '$APP_PKG
+[ -f $OUTPUT/recovery.tar.bz2 ] && echo 'Recovery '$RECOVER_VERSION
 echo
 [ $skippartitioning = 0 ] && echo -e '\E[1;32m!!! Partitions will be formatted !!!'; echo;
 
@@ -305,7 +306,7 @@ echo -e 'Versions: '  						>> $DEST/version.txt
 [ -f $OUTPUT/$KERNEL_PKG ]  && echo 'Kernel ' $KERNEL_VERSION	>> $DEST/version.txt
 [ -f $OUTPUT/$ROOTFS_PKG ]  && echo 'Rootfs ' $ROOTFS_VERSION	>> $DEST/version.txt
 [ -f $OUTPUT/app.tar.bz2 ]   && echo 'App    ' $APP_PKG		>> $DEST/version.txt
-[ -f $OUTPUT/recovery.tar.bz2 ] && echo 'Recovery added' >> $DEST/version.txt
+[ -f $OUTPUT/recovery.tar.bz2 ] && echo 'Recovery ' $RECOVER_VERSION >> $DEST/version.txt
 echo
 [ $skippartitioning = 0 ] && echo -e 'Partitions will be formatted !!!' >> $DEST/version.txt
 
