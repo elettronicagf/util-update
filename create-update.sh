@@ -3,9 +3,9 @@
 PASSWORD='12kjh8dfs[324'
 SUPPORTED_DEVICES='MBUGRFiMX6'
 
-UBOOT_VERSION=MBUGRFiMX6-005
+UBOOT_VERSION=MBUGRFiMX6-006
 SPL_VERSION=$UBOOT_VERSION
-KERNEL_VERSION=MBUGRFiMX6-007
+KERNEL_VERSION=MBUGRFiMX6-008
 ROOTFS_VERSION_LIGHT=3.0
 ROOTFS_VERSION_FULL=4.0
 ROOTFSLIVE_VERSION=MBUGRFiMX6-002
@@ -125,6 +125,7 @@ avconv  -i $IMAGES/upgradeCompleted.bmp -vcodec rawvideo -f rawvideo -pix_fmt rg
 gzip < tmp/upgradeCompleted.bin > $OUTPUT/upgradeCompleted.gz
 avconv  -i $IMAGES/errorUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb565le tmp/errorUpdating.bin 1>/dev/null 2>&1
 gzip < tmp/errorUpdating.bin > $OUTPUT/errorUpdating.gz
+[ -f $IMAGES/logoBoot.bmp ] && gzip < $IMAGES/logoBoot.bmp > $OUTPUT/logoBoot.gz
 cp template-setup.sh $OUTPUT/setup.sh
 
 #build u-boot+SPL update
@@ -299,6 +300,7 @@ tar cvf update.tar setup.sh supported_devices
 [ -f updatingFirmware.gz ]  && tar -rf update.tar updatingFirmware.gz
 [ -f upgradeCompleted.gz ]  && tar -rf update.tar upgradeCompleted.gz
 [ -f errorUpdating.gz ]     && tar -rf update.tar errorUpdating.gz
+[ -f logoBoot.gz ]          && tar -rf update.tar logoBoot.gz
 [ -f $KERNEL_PKG ]          && tar -rf update.tar $KERNEL_PKG
 [ -f $UBOOT_PKG ]           && tar -rf update.tar $UBOOT_PKG
 [ -f $ROOTFS_PKG ]          && tar -rf update.tar $ROOTFS_PKG
