@@ -109,47 +109,6 @@ fi
 
 message "Update compatibility validated"
 
-#---------------------------------------------------------------------------------------------------------------
-# Show Initial Page with countdown
-#---------------------------------------------------------------------------------------------------------------
-if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
-
-	echo 1 > /sys/class/leds/LED-1/brightness
-
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz --occurrence=1 -C / version.ini
-
-	SD_ONBOARD_VER=$(cat $MOUNT_POINT_APP/version.ini | grep SDRel | awk -F'=' '{print $2}')
-	SD_UPDATE_VER=$(cat /version.ini | grep -i SDRel | awk -F'=' '{print $2}')
-	echo "SD ONBOARD: " $SD_ONBOARD_VER
-	echo "UPDATE: " $SD_UPDATE_VER
-	if [ -z "$SD_ONBOARD_VER" ]; then
-		SD_ONBOARD_VER="NONE"
-	fi
-	if [ -z "$SD_UPDATE_VER" ]; then
-		SD_UPDATE_VER="NONE"
-	fi
-
-	message "Extracting mbugrf fw update"
-    mkdir /mbufw
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /mbufw mbufw.tar.gz 
-	if [ $? -ne 0 ]; then
-		error_handler "Error while unpacking mbugrf fw update from update package"
-	fi
-	
-	#unpack u-boot update
-	tar xmf /mbufw/mbufw.tar.gz -C /mbufw 
-	if [ $? -ne 0 ]; then
-		error_handler "Error while extracting mbugrf fw update files"
-	fi
-
-
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 firstPage.gz | zcat > /dev/fb0
-
-	sleep 5
-	/mbufw/$WBS_APP /dev/ttymxc1  /mbufw/$MBU_FW "$SD_ONBOARD_VER" "$SD_UPDATE_VER "
-	
-fi
-
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 startUpdating.gz | zcat > /dev/fb0
 
 #---------------------------------------------------------------------------------------------------------------
@@ -491,12 +450,56 @@ if [ "$UPDATE_APP" = "true" ]; then
 	fi
 fi
 
+
+#---------------------------------------------------------------------------------------------------------------
+# Show Initial Page with countdown
+#---------------------------------------------------------------------------------------------------------------
+if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
+
+	echo 1 > /sys/class/leds/LED-1/brightness
+
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz --occurrence=1 -C / version.ini
+
+	SD_ONBOARD_VER=$(cat $MOUNT_POINT_APP/version.ini | grep SDRel | awk -F'=' '{print $2}')
+	SD_UPDATE_VER=$(cat /version.ini | grep -i SDRel | awk -F'=' '{print $2}')
+	echo "SD ONBOARD: " $SD_ONBOARD_VER
+	echo "UPDATE: " $SD_UPDATE_VER
+	if [ -z "$SD_ONBOARD_VER" ]; then
+		SD_ONBOARD_VER="NONE"
+	fi
+	if [ -z "$SD_UPDATE_VER" ]; then
+		SD_UPDATE_VER="NONE"
+	fi
+
+	message "Extracting mbugrf fw update"
+    mkdir /mbufw
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /mbufw mbufw.tar.gz 
+	if [ $? -ne 0 ]; then
+		error_handler "Error while unpacking mbugrf fw update from update package"
+	fi
+	
+	#unpack u-boot update
+	tar xmf /mbufw/mbufw.tar.gz -C /mbufw 
+	if [ $? -ne 0 ]; then
+		error_handler "Error while extracting mbugrf fw update files"
+	fi
+
+
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 firstPage.gz | zcat > /dev/fb0
+
+	sleep 5
+	message "/mbufw/$WBS_APP"
+	/mbufw/$WBS_APP /dev/ttymxc1  /mbufw/$MBU_FW "$SD_ONBOARD_VER" "$SD_UPDATE_VER "
+	
+fi
+
+
 #---------------------------------------------------------------------------------------------------------------
 # MBU FW
 #---------------------------------------------------------------------------------------------------------------
 
 if [ "$UPDATE_MBUGRF_FW" = "true" ]; then
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingFirmware.gz | zcat > /dev/fb0
+#	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 updatingFirmware.gz | zcat > /dev/fb0
 	sleep 5
 	/mbufw/$WBS_APP /dev/ttymxc1  a /mbufw/$MBU_FW
 	sleep 3
