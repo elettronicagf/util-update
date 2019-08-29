@@ -353,7 +353,6 @@ if [ "$UPDATE_KERNEL" = "true" ]; then
 				error_handler "Kernel update installation on eMMC/SD failed"
 			fi
 		fi
-		umount $dest_boot_partition
 	fi
 	message "Successfully updated kernel and dtbs"
 fi
@@ -362,6 +361,8 @@ fi
 # Logo boot
 #---------------------------------------------------------------------------------------------------------------
 tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 logoBoot.gz | zcat > $dest_boot_partition/logo.bmp
+
+umount $dest_boot_partition
 
 #---------------------------------------------------------------------------------------------------------------
 # Rootfs
