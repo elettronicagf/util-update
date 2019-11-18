@@ -164,7 +164,7 @@ if [ $skipkernel = 0 ]; then
 	cd $KERNEL_BINARIES
 	tar cvf $OUTPUT/kernel.tar zImage *.dtb $tar_options
 	cd $IMAGES
-	tar rf $OUTPUT/kernel.tar logo-boot*.bmp $tar_options
+	tar rf $OUTPUT/kernel.tar logo-boot.bmp $tar_options
 	cd $OUTPUT
 	gzip kernel.tar
 	cd $HOME
@@ -206,7 +206,7 @@ mount $FIRST_AVAILABLE_LOOP_DEV'p1' mnt/
 #copy live image
 if [ -f $KERNEL_LIVE_BINARIES/zImage ]; then
 	cp $KERNEL_LIVE_BINARIES/* mnt/
-	#add splash images
+	cp $IMAGES/logo-boot.bmp mnt/
 else
     error "Live image not found"
 fi
@@ -255,8 +255,8 @@ cat header payload > update.eup
 cp update.eup $DEST/update.eup
 cd ..
 
-cp $IMAGES/logo-updating-800x480.bmp $DEST/logo-boot-800x480.bmp
-cp $IMAGES/logo-updating-1280x800.bmp $DEST/logo-boot-1280x800.bmp
+#cp $IMAGES/logo-updating-800x480.bmp $DEST/logo-boot-800x480.bmp
+#cp $IMAGES/logo-updating-1280x800.bmp $DEST/logo-boot-1280x800.bmp
 
 #cleanup
 rm -rf ./tmp
