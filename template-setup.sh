@@ -1,3 +1,5 @@
+#set -x
+
 PASSWORD=""
 UPDATE_UBOOT="false"
 UPDATE_KERNEL="false"
@@ -16,7 +18,7 @@ message() {
 error_handler() {
 	message "##### Error: $1 #####"
 	# Show "update error" splash screen
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-error.gz | zcat > /dev/fb0
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 logo-update-error$res.gz | zcat > /dev/fb0
 	exit 1;
 }
 
@@ -42,6 +44,18 @@ get_cpu_from_cmdline() {
 		fi
 	done;
 	echo $CPU;
+}
+
+get_display() {
+	local CMDLINE=$(cat /proc/cmdline)
+	local DISPLAY=" "
+	for i in $CMDLINE; do
+		if [ "${i:0:5}" = "panel" ]; then
+			DISPLAY=${i#panel=}
+			break;
+		fi
+	done;
+	echo $DISPLAY;	
 }
 
 # Write file to NAND Flash and verify
@@ -70,7 +84,7 @@ fi;
 type=emmc
 mkfs=0
 wid=$(get_wid_from_cmdline)
-kernel_dt_file=imx6-egf-"$wid".dtb
+kernel_dt_file=egf-sbc-"$wid".dtb
 kernel_image_file=zImage
 UPDATE_TAR_OFFSET="16777253"
 
@@ -79,7 +93,7 @@ message "Update path is $UPDATE_PATH"
 
 if [ $type = emmc ]; then
 	message "Updating EMMC"
-	dest_dev=mmcblk2
+	dest_dev=mmcblk0
 elif [ $type = sdcard ]; then
 	message "Updating SDCARD"
 	dest_dev=mmcblk0
@@ -95,36 +109,42 @@ if [ $type = nand ]; then
 	dest_rootfs_partition=/dev/mtd2
 	dest_app_partition=/dev/mtd3
 else
-	mtd_spl=/dev/mtd4
-	mtd_uboot=/dev/mtd5
+	mtd_spl=/dev/mtd0
+	mtd_uboot=/dev/mtd1
 	dest_boot_partition=/run/media/$dest_dev'p1'
 	dest_rootfs_partition=/run/media/$dest_dev'p2'
 	dest_app_partition=/run/media/$dest_dev'p2'
 	dest_app_dir=/home/root
 fi
 
-#Orientation is related to accelerometer, not display
-accelerometer_orientation=$(/usr/bin/accelerometerOrientation)
-message "Accelerometer orientation is: $accelerometer_orientation"
+#get display resolution
+display=$(get_display)
+case "$display" in
+	EGF_BLC1177)
+		res="800x480"
+		;;
+
+	EGF_BLC1182)
+		res="1280x800"
+		;;
+	
+	*)
+		echo "display type [$display] not recognized"
+		res="800x480"
+esac	
+res="-$res"
+
 
 # Show "updating" splash screen
-case $accelerometer_orientation in
-	"Portrait Up" | "Portrait Down" | "Landscape Left" | "Landscape Right")
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
-		;;
-	*)
-		message "Orientation error"
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-splash.gz | zcat > /dev/fb0
-		;;
-esac
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 logo-updating$res.gz | zcat > /dev/fb0
 
 message "Check update compatibility"
-tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C / supported_devices
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C / supported_devices
 BOARD_FAMILY=$(strings -n 20 $mtd_spl | grep "^U-Boot.*(" | awk -F "-" '{ print $3 }')
 grep $BOARD_FAMILY /supported_devices > /dev/null
 
 if [ $? -ne 0 ]; then
-  error_handler "Unsupported board $BOARD_FAMILY"
+  error_handler "Unsupported board $BOARD_FAMILY" 
 fi
 
 message "Update compatibility validated"
@@ -134,14 +154,16 @@ message "Update compatibility validated"
 #---------------------------------------------------------------------------------------------------------------
 if [ $type!=nand ]; then
 #----------------------
-#eMMC partitioning:
-#Disk /dev/mmcblk2: , 3909091328 bytes
-#4 heads, 16 sectors/track, 119296 cylinders
-#Units = cylinders of 64 * 512 = 32768 bytes
+#Disk /dev/mmcblk0: 3.7 GiB, 3909091328 bytes, 7634944 sectors
+#Units: sectors of 1 * 512 = 512 bytes
+#Sector size (logical/physical): 512 bytes / 512 bytes
+#I/O size (minimum/optimal): 512 bytes / 512 bytes
+#Disklabel type: dos
+#Disk identifier: 0x00000000
 #
-#   Device Boot      Start         End      Blocks   Id  System
-#/dev/sdd1            2048       43007       20480    c  W95 FAT32 (LBA)
-#/dev/sdd2           43008     2140159     1048576   83  Linux
+#Device         Boot Start     End Sectors  Size Id Type
+#/dev/mmcblk0p1       2048   43007   40960   20M  c W95 FAT32 (LBA)
+#/dev/mmcblk0p2      43008 7634943 7591936  3.6G 83 Linux
 #----------------------
 if [ $mkfs = 1 ]; then
 	message "Partitioning $dest_dev..."
@@ -155,14 +177,14 @@ if [ $mkfs = 1 ]; then
 	mkfs.vfat /dev/$dest_dev'p1'
     if [ $? -ne 0 ]; then 
         umount /dev/$dest_dev'p1'
-        mkfs.vfat /dev/$dest_dev'p1'
+        mkfs.vfat -F /dev/$dest_dev'p1'
     fi
     
     message "Formatting '$dest_dev'p2..."
-	mkfs.ext4 /dev/$dest_dev'p2'
+	mkfs.ext4 -F /dev/$dest_dev'p2'
     if [ $? -ne 0 ]; then 
         umount /dev/$dest_dev'p2'
-        mkfs.ext4 /dev/$dest_dev'p2'
+        mkfs.ext4 -F /dev/$dest_dev'p2'
     fi
     
 	udevadm trigger --action=add
@@ -177,9 +199,9 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 	message "Extracting bootloader update"
     #extracting bootloader update from update package
     mkdir /uboot
-	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /uboot uboot.tar.gz 
+	tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xm --occurrence=1 -C /uboot uboot.tar.gz 
 	if [ $? -ne 0 ]; then
-		error_handler "Error while unpacking bootloader update from update package"
+		error_handler "Error whstrings -n 20 ile unpacking bootloader update from update package"
 	fi
 	
 	#unpack u-boot update
@@ -190,25 +212,15 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 	
     message "Check u-boot and SPL current versions"
     
-    UBOOT_VERSION_STRING=$(strings -n 20 $mtd_uboot | grep "^U-Boot.*(" | awk -F "-" '{ print $4 }' | awk '{ print $1}')
+    UBOOT_VERSION_STRING=$(strings -n 20 $mtd_uboot | grep "^U-Boot 20.*(" | awk -F "-" '{ print $4 }' | awk '{ print $1}')
     UBOOT_VERSION=$(expr $UBOOT_VERSION_STRING + 0);
     SPL_VERSION_STRING=$(strings -n 20 $mtd_spl | grep "^U-Boot.*(" | awk -F "-" '{ print $4 }' | awk '{ print $1}')
     SPL_VERSION=$(expr $SPL_VERSION_STRING + 0);
     
-    CPU=$(get_cpu_from_cmdline)
-    echo "Detected cpu type $CPU"
-    if [ "$CPU" = "6ULL" ]; then
-		CPU_PREFIX="mx6ull"
-	elif [ "$CPU" = "6UL" ]; then
-		CPU_PREFIX="mx6ul"
-	else
-		error_handler "CPU type not supported for this upgrade package"
-	fi
-    
-    if [ -f /uboot/spl.img-$CPU_PREFIX ]; then
-        UPD_SPL_VERSION_STRING=$(strings -n 20 /uboot/spl.img-$CPU_PREFIX | grep "^U-Boot.*(" | awk -F "-" '{ print $4 }' | awk '{ print $1}')
+    if [ -f /uboot/spl.img ]; then
+        UPD_SPL_VERSION_STRING=$(strings -n 20 /uboot/spl.img | grep "^U-Boot.*(" | awk -F "-" '{ print $4 }' | awk '{ print $1}')
 		UPD_SPL_VERSION=$(expr $UPD_SPL_VERSION_STRING + 0);
-		UPD_SPL_BOARD_FAMILY=$(strings -n 20 /uboot/spl.img-$CPU_PREFIX | grep "^U-Boot.*(" | awk -F "-" '{ print $3 }')
+		UPD_SPL_BOARD_FAMILY=$(strings -n 20 /uboot/spl.img | grep "^U-Boot.*(" | awk -F "-" '{ print $3 }')
 		
     	if [ "$UPD_SPL_BOARD_FAMILY" != "$BOARD_FAMILY" ]; then
 			error_handler "Unsupported bootloader board family. Detected SPL: $UPD_SPL_BOARD_FAMILY"
@@ -223,10 +235,10 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 		dd if=$mtd_spl of=/uboot/mtdspl.bin.backup &>/dev/null
 	fi
 	
-    if [ -f /uboot/u-boot.img-$CPU_PREFIX ]; then	
-		UPD_UBOOT_VERSION_STRING=$(strings -n 20 /uboot/u-boot.img-$CPU_PREFIX | grep "^U-Boot.*(" | awk -F "-" '{ print $4 }' | awk '{ print $1}')
+    if [ -f /uboot/u-boot.img ]; then	
+		UPD_UBOOT_VERSION_STRING=$(strings -n 20 /uboot/u-boot.img | grep "^U-Boot 20.*(" | awk -F "-" '{ print $4 }' | awk '{ print $1}')
 		UPD_UBOOT_VERSION=$(expr $UPD_UBOOT_VERSION_STRING + 0);
-		UPD_UBOOT_BOARD_FAMILY=$(strings -n 20 /uboot/u-boot.img-$CPU_PREFIX | grep "^U-Boot.*(" | awk -F "-" '{ print $3 }')
+		UPD_UBOOT_BOARD_FAMILY=$(strings -n 20 /uboot/u-boot.img | grep "^U-Boot 20.*(" | awk -F "-" '{ print $3 }')
 	    if [ "$UPD_UBOOT_BOARD_FAMILY" != "$BOARD_FAMILY" ]; then
 			error_handler "Unsupported bootloader board family. Detected U-Boot: $UPD_UBOOT_BOARD_FAMILY"
 		fi
@@ -241,17 +253,17 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 	fi
 
     #rw nor
-    echo 112 > /sys/class/gpio/export
-    echo out > /sys/class/gpio/gpio112/direction
-    echo 1 > /sys/class/gpio/gpio112/value
+    echo 131 > /sys/class/gpio/export
+    echo out > /sys/class/gpio/gpio131/direction
+    echo 1 > /sys/class/gpio/gpio131/value
 
-	if [ -f /uboot/spl.img-$CPU_PREFIX ]; then
+	if [ -f /uboot/spl.img ]; then
 		#Do update spl
 		message "Installing SPL update"
 		flash_unlock $mtd_spl
 		dd if=$mtd_spl of=/uboot/spl-header.bin bs=1024 count=1 &>/dev/null
 		cp /uboot/spl-header.bin /uboot/mtdspl.bin
-		cat /uboot/spl.img-$CPU_PREFIX >> /uboot/mtdspl.bin
+		cat /uboot/spl.img >> /uboot/mtdspl.bin
 		flashcp /uboot/mtdspl.bin  $mtd_spl
 		if [ $? -ne 0 ]; then
 			message "SPL installation failed. Retrying..."
@@ -267,14 +279,14 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 		flash_lock $mtd_spl
 	fi	
 
-    if [ -f /uboot/u-boot.img-$CPU_PREFIX ]; then	
+    if [ -f /uboot/u-boot.img ]; then	
 		#Do update u-boot
 		message "Installing U-Boot update"
 		flash_unlock $mtd_uboot
-		flashcp /uboot/u-boot.img-$CPU_PREFIX  $mtd_uboot
+		flashcp /uboot/u-boot.img  $mtd_uboot
 		if [ $? -ne 0 ]; then
 			message "U-Boot installation failed. Retrying..."
-			flashcp /uboot/u-boot.img-$CPU_PREFIX  $mtd_uboot
+			flashcp /uboot/u-boot.img  $mtd_uboot
 			if [ $? -ne 0 ]; then
 				message "U-Boot installation failed. Recovering U-Boot from backup file..."
 				flashcp /uboot/u-boot.img.backup  $mtd_uboot
@@ -287,7 +299,7 @@ if [ "$UPDATE_UBOOT" = "true" ]; then
 	fi
 
 	#ro nor
-	echo 0 > /sys/class/gpio/gpio112/value
+	echo 0 > /sys/class/gpio/gpio131/value
 	rm -r /uboot
 fi
 
@@ -305,12 +317,12 @@ if [ "$UPDATE_KERNEL" = "true" ]; then
 		message "Writing $kernel_image_file"
 		
 		flash_erase $dest_kernel_partition 0 0
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_image_file | nandwrite -p $dest_kernel_partition -
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_image_file | nandwrite -p $dest_kernel_partition -
 		
 		if [ $? -ne 0 ]; then
 			message "Kernel installation on NAND Flash failed. Retrying..."
 			flash_erase $dest_kernel_partition 0 0
-			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_image_file | nandwrite -p $dest_kernel_partition -
+			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_image_file | nandwrite -p $dest_kernel_partition -
 			if [ $? -ne 0 ]; then
 				error_handler "Kernel update installation on NAND Flash failed"
 			fi
@@ -319,12 +331,12 @@ if [ "$UPDATE_KERNEL" = "true" ]; then
 		#Update dtb
 		message "Writing $kernel_dt_file"
 		flash_erase $dest_dtb_partition 0 0
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_dt_file | nandwrite -p $dest_dtb_partition -
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_dt_file | nandwrite -p $dest_dtb_partition -
 
 		if [ $? -ne 0 ]; then
 			message "DTB installation on NAND Flash failed. Retrying..."
 			flash_erase $dest_dtb_partition 0 0
-			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_dt_file | nandwrite -p $dest_dtb_partition -
+			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar xOzm $kernel_dt_file | nandwrite -p $dest_dtb_partition -
 			if [ $? -ne 0 ]; then
 				error_handler "DTB update installation on NAND Flash failed"
 			fi
@@ -333,10 +345,10 @@ if [ "$UPDATE_KERNEL" = "true" ]; then
 	else
 		#eMMC or SDCARD
 		message "Installing kernel update -> $dest_boot_partition"
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar -xmz -C $dest_boot_partition
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar -xmz --no-same-owner -C $dest_boot_partition
 		if [ $? -ne 0 ]; then
 			message "Kernel installation failed. Retrying..."
-			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar -xmz -C $dest_boot_partition
+			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar xOm --occurrence=1 kernel.tar.gz | tar -xmz --no-same-owner -C $dest_boot_partition
 			if [ $? -ne 0 ]; then
 				error_handler "Kernel update installation on eMMC/SD failed"
 			fi
@@ -355,11 +367,11 @@ if [ "$UPDATE_ROOTFS" = "true" ]; then
 	if [ "$type" = "nand" ]; then 
 		#NAND
 		message "Installing rootfs update -> $dest_rootfs_partition"
-		UBISIZE=$( tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -tv  --occurrence=1 rootfs.ubi | awk '{print $3}')
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
+		UBISIZE=$( tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -tv  --occurrence=1 rootfs.ubi | awk '{print $3}')
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
 		if [ $? -ne 0 ]; then
 			message "Writing ubi rootfs partition failed. Retrying..."
-			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
+			tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.ubi | ubiformat $dest_rootfs_partition -f - --yes -S$UBISIZE
 			if [ $? -ne 0 ]; then
 				error_handler "Failed extracting and writing rootfs"
 			fi
@@ -368,7 +380,7 @@ if [ "$UPDATE_ROOTFS" = "true" ]; then
 	else
 		#eMMC or SDCARD
 		message "Extracting and writing rootfs. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.tar.bz2 | tar -xmj -C $dest_rootfs_partition		
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 rootfs.tar.bz2 | tar -xmj -C $dest_rootfs_partition		
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing rootfs"
 		fi
@@ -413,7 +425,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 		mount -t ubifs ubi1:app /run/media/home/
 		
 		message "Extracting and writing app data. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C /run/media/home
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C /run/media/home
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing app data"
 		fi
@@ -429,7 +441,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 			error_handler "Failed extracting and writing app data, unable to find /home/root directory in rootfs"
 		fi
 		message "Extracting and writing app data. This may take several minutes..."
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C "$app_dir"
+		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 app.tar.gz | tar -xmz -C "$app_dir"
 		if [ $? -ne 0 ]; then
 			error_handler "Failed extracting and writing app data"
 		fi
@@ -439,15 +451,7 @@ if [ "$UPDATE_APP" = "true" ]; then
 fi
 
 # Show "update terminated" splash screen
-case $accelerometer_orientation in
-	"Portrait Up" | "Portrait Down" | "Landscape Left" | "Landscape Right")
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
-		;;
-	*)
-		message "Orientation error"
-		tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 update-terminated.gz | zcat > /dev/fb0
-		;;
-esac
+tail -c +$UPDATE_TAR_OFFSET $UPDATE_PATH | openssl enc -aes-256-cbc -md md5 -d -pass pass:$PASSWORD 2> /dev/null | tar -xm -O --occurrence=1 logo-update-terminated$res.gz | zcat > /dev/fb0
 
 umount /dev/mmcblk*
 umount /dev/sd*
