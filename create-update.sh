@@ -83,19 +83,32 @@ rm setup.sh 1>/dev/null 2>&1
 #each image must match the screen resolution and framebuffer format (rgb,bgr,rgb565,..)
 #--------------------------------------------------------------------------------------------------------
 #graphics
+VTMP=$(which avconv)
+if [ -z $VTMP ]; then
+  VTMP=$(which ffmpeg)
+  [ ! -z $VTMP ] && CONV=ffmpeg
+else
+  CONV=avconv
+fi
+  
+if [ -z $CONV ]; then
+  error "Image converter not found, install either avconv or ffmpeg"
+  exit
+fi
+    
 message "Building graphics"
 #cp images/logo-boot.bmp $OUTPUT/logo.bmp
-avconv  -i $IMAGES/logo-updating-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1024x600.bin 1>/dev/null 2>&1
+$CONV  -i $IMAGES/logo-updating-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1024x600.bin 1>/dev/null 2>&1
 gzip < tmp/update-splash-1024x600.bin > $OUTPUT/update-splash-1024x600.gz
-avconv  -i $IMAGES/logo-update-terminated-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1024x600.bin 1>/dev/null 2>&1
+$CONV  -i $IMAGES/logo-update-terminated-1024x600.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1024x600.bin 1>/dev/null 2>&1
 gzip < tmp/update-terminated-1024x600.bin > $OUTPUT/update-terminated-1024x600.gz
-avconv  -i $IMAGES/logo-updating-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1280x800.bin 1>/dev/null 2>&1
+$CONV  -i $IMAGES/logo-updating-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-1280x800.bin 1>/dev/null 2>&1
 gzip < tmp/update-splash-1280x800.bin > $OUTPUT/update-splash-1280x800.gz
-avconv  -i $IMAGES/logo-update-terminated-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1280x800.bin 1>/dev/null 2>&1
+$CONV  -i $IMAGES/logo-update-terminated-1280x800.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-1280x800.bin 1>/dev/null 2>&1
 gzip < tmp/update-terminated-1280x800.bin > $OUTPUT/update-terminated-1280x800.gz
-avconv  -i $IMAGES/logo-updating-800x480.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-800x480.bin 1>/dev/null 2>&1
+$CONV  -i $IMAGES/logo-updating-800x480.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash-800x480.bin 1>/dev/null 2>&1
 gzip < tmp/update-splash-800x480.bin > $OUTPUT/update-splash-800x480.gz
-avconv  -i $IMAGES/logo-update-terminated-800x480.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-800x480.bin 1>/dev/null 2>&1
+$CONV  -i $IMAGES/logo-update-terminated-800x480.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated-800x480.bin 1>/dev/null 2>&1
 gzip < tmp/update-terminated-800x480.bin > $OUTPUT/update-terminated-800x480.gz
 
 
