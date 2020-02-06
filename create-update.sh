@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #set -x
 ZIP_PASSWORD=""
 #"-P password"
