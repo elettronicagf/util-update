@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #set -x
 PASSWORD='92874j(2]ct!'
 SUPPORTED_DEVICES='0659'
