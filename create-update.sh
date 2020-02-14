@@ -49,9 +49,23 @@ error() {
 }
 
 bmp2rgb() {
-	avconv  -i $IMAGES/$1.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb32 tmp/$1.bmp.bin 1>/dev/null 2>&1
+	$CONV  -i $IMAGES/$1.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgb32 tmp/$1.bmp.bin 1>/dev/null 2>&1
 	gzip < tmp/$1.bmp.bin > $OUTPUT/$1.gz	
 }
+
+#setup image conversion utility
+VTMP=$(which avconv)
+if [ -z $VTMP ]; then
+  VTMP=$(which ffmpeg)
+  [ ! -z $VTMP ] && CONV=ffmpeg
+else
+  CONV=avconv
+fi
+  
+if [ -z $CONV ]; then
+  error "Image converter not found, install either avconv or ffmpeg"
+  exit
+fi
 
 TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,cpu:,help -- "$@")
 [ $? -eq 1 ] && exit
