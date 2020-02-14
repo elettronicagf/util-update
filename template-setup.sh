@@ -123,6 +123,10 @@ case "$display" in
 	EGF_BLC1177)
 		res="800x480"
 		;;
+		
+	EGF_BLC1185)
+		res="800x480"
+		;;		
 
 	EGF_BLC1182)
 		res="1280x800"
