@@ -287,7 +287,7 @@ tar cvf update.tar setup.sh supported_devices
 [ -f app.tar.bz2 ]           && tar -rf update.tar app.tar.bz2
 [ -f recovery.tar.bz2 ]      && tar -rf update.tar recovery.tar.bz2
 
-cat update.tar | openssl enc -aes-256-cbc -pass pass:$PASSWORD > update.tar.enc
+cat update.tar | openssl enc -aes-256-cbc -md md5 -pass pass:$PASSWORD > update.tar.enc
 rm update.tar
 cat fat.bin update.tar.enc > payload
 SUM=$(md5sum payload | awk '{print $1;}')
