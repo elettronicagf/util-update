@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #set -x
 PASSWORD='12kjh8dfs[324'
 SUPPORTED_DEVICES='SMGGRF'
