@@ -45,6 +45,25 @@ error() {
 	echo " "	
 }
 
+bmp2rgb() {
+	$CONV  -i $IMAGES/$1.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/$1.bin 1>/dev/null 2>&1
+	gzip < tmp/$1.bin > $OUTPUT/$1.gz	
+}
+
+#setup image conversion utility
+VTMP=$(which avconv)
+if [ -z $VTMP ]; then
+  VTMP=$(which ffmpeg)
+  [ ! -z $VTMP ] && CONV=ffmpeg
+else
+  CONV=avconv
+fi
+  
+if [ -z $CONV ]; then
+  error "Image converter not found, install either avconv or ffmpeg"
+  exit
+fi
+
 TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,apppkg:,help -- "$@")
 [ $? -eq 1 ] && exit
 
@@ -92,28 +111,18 @@ fi
 #--------------------------------------------------------------------------------------------------------
 #graphics
 message "Building graphics"
-avconv  -i $IMAGES/validatingUpgrade.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/validatingUpgrade.bin 1>/dev/null 2>&1
-gzip < tmp/validatingUpgrade.bin > $OUTPUT/validatingUpgrade.gz
-avconv  -i $IMAGES/firstPage.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/firstPage.bin 1>/dev/null 2>&1
-gzip < tmp/firstPage.bin > $OUTPUT/firstPage.gz
-avconv  -i $IMAGES/startUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/startUpdating.bin 1>/dev/null 2>&1
-gzip < tmp/startUpdating.bin > $OUTPUT/startUpdating.gz
-avconv  -i $IMAGES/formattingEMMC.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/formattingEMMC.bin 1>/dev/null 2>&1
-gzip < tmp/formattingEMMC.bin > $OUTPUT/formattingEMMC.gz
-avconv  -i $IMAGES/updatingBootloader.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/updatingBootloader.bin 1>/dev/null 2>&1
-gzip < tmp/updatingBootloader.bin > $OUTPUT/updatingBootloader.gz
-avconv  -i $IMAGES/updatingKernel.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/updatingKernel.bin 1>/dev/null 2>&1
-gzip < tmp/updatingKernel.bin > $OUTPUT/updatingKernel.gz
-avconv  -i $IMAGES/updatingRootfs.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/updatingRootfs.bin 1>/dev/null 2>&1
-gzip < tmp/updatingRootfs.bin > $OUTPUT/updatingRootfs.gz
-avconv  -i $IMAGES/updatingApplication.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/updatingApplication.bin 1>/dev/null 2>&1
-gzip < tmp/updatingApplication.bin > $OUTPUT/updatingApplication.gz
-avconv  -i $IMAGES/updatingFirmware.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/updatingFirmware.bin 1>/dev/null 2>&1
-gzip < tmp/updatingFirmware.bin > $OUTPUT/updatingFirmware.gz
-avconv  -i $IMAGES/upgradeCompleted.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/upgradeCompleted.bin 1>/dev/null 2>&1
-gzip < tmp/upgradeCompleted.bin > $OUTPUT/upgradeCompleted.gz
-avconv  -i $IMAGES/errorUpdating.bmp -vcodec rawvideo -f rawvideo -pix_fmt rgba tmp/errorUpdating.bin 1>/dev/null 2>&1
-gzip < tmp/errorUpdating.bin > $OUTPUT/errorUpdating.gz
+bmp2rgb validatingUpgrade
+bmp2rgb firstPage
+bmp2rgb startUpdating
+bmp2rgb formattingEMMC
+bmp2rgb updatingBootloader
+bmp2rgb updatingKernel
+bmp2rgb updatingRootfs
+bmp2rgb updatingApplication
+bmp2rgb updatingFirmware
+bmp2rgb upgradeCompleted
+bmp2rgb errorUpdating
+
 cp template-setup.sh $OUTPUT/setup.sh
 
 #build u-boot+SPL update
