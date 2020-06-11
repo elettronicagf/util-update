@@ -257,7 +257,7 @@ tar cvf update.tar setup.sh supported_devices
 [ -f $ROOTFS_PKG ]          && tar -rf update.tar $ROOTFS_PKG
 [ -f $APP_PKG ]             && tar -rf update.tar $APP_PKG
 
-cat update.tar | openssl enc -aes-256-cbc -pass pass:$PASSWORD > update.tar.enc
+cat update.tar | openssl enc -aes-256-cbc -md md5 -pass pass:$PASSWORD > update.tar.enc
 rm update.tar
 cat fat.bin update.tar.enc > payload
 SUM=$(md5sum payload | awk '{print $1;}')
