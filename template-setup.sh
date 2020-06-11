@@ -1,10 +1,12 @@
-set -x
+#set -x
 PASSWORD=""
 UPDATE_UBOOT="false"
 UPDATE_KERNEL="false"
 UPDATE_ROOTFS="false"
 UPDATE_APP="false"
 
+#switch on backlight
+echo 11 > /sys/devices/soc0/backlight.18/backlight/backlight.18/brightness
 
 message() {
 	echo "##### $1 #####"
