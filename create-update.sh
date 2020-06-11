@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #set -x
 PASSWORD='47382e)9[xh?'
 SUPPORTED_DEVICES='0508'
@@ -45,6 +45,25 @@ error() {
 	echo " "	
 }
 
+bmp2rgb() {
+	$CONV  -i $IMAGES/$1.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/$1.bmp.bin 1>/dev/null 2>&1
+	gzip < tmp/$1.bmp.bin > $OUTPUT/$2.gz	
+}
+
+#setup image conversion utility
+VTMP=$(which avconv)
+if [ -z $VTMP ]; then
+  VTMP=$(which ffmpeg)
+  [ ! -z $VTMP ] && CONV=ffmpeg
+else
+  CONV=avconv
+fi
+  
+if [ -z $CONV ]; then
+  error "Image converter not found, install either avconv or ffmpeg"
+  exit
+fi
+
 TEMP=$(getopt -o 1 -l no-uboot,no-spl,no-kernel,no-rootfs,makepartition,help -- "$@")
 [ $? -eq 1 ] && exit
 
@@ -85,12 +104,9 @@ rm setup.sh 1>/dev/null 2>&1
 #--------------------------------------------------------------------------------------------------------
 #graphics
 message "Building graphics"
-avconv  -i $IMAGES/logo-itema-updating.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-splash.bin 1>/dev/null 2>&1
-gzip < tmp/update-splash.bin > $OUTPUT/update-splash.gz
-avconv  -i $IMAGES/logo-itema-update-terminated.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-terminated.bin 1>/dev/null 2>&1
-gzip < tmp/update-terminated.bin > $OUTPUT/update-terminated.gz
-avconv  -i $IMAGES/logo-itema-update-error.bmp -vcodec rawvideo -f rawvideo -pix_fmt bgr24 tmp/update-error.bin 1>/dev/null 2>&1
-gzip < tmp/update-error.bin > $OUTPUT/update-error.gz
+bmp2rgb logo-itema-updating           update-splash
+bmp2rgb logo-itema-update-terminated  update-terminated
+bmp2rgb logo-itema-update-error       update-error
 
 cp template-setup.sh $OUTPUT/setup.sh
 
