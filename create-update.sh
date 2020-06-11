@@ -249,9 +249,9 @@ echo -n $SUPPORTED_DEVICES > supported_devices
 #build update file
 message "Packaging files"
 tar cvf update.tar setup.sh supported_devices
-[ -f update-splash.gz ]     && tar -rf update.tar update-splash.gz
-[ -f update-terminated.gz ] && tar -rf update.tar update-terminated.gz
-[ -f update-error.gz ] 		&& tar -rf update.tar update-error.gz
+tar -rf update.tar update-splash.gz
+tar -rf update.tar update-terminated.gz
+tar -rf update.tar update-error.gz
 [ -f $KERNEL_PKG ]          && tar -rf update.tar $KERNEL_PKG
 [ -f $UBOOT_PKG ]           && tar -rf update.tar $UBOOT_PKG
 [ -f $ROOTFS_PKG ]          && tar -rf update.tar $ROOTFS_PKG
