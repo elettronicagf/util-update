@@ -137,19 +137,7 @@ cd ..
 #-------------------
 if [ $skipkernel = 0 ]; then
 	message "Adding kernel"
-    filename_modules=$KERNEL_BINARIES/$MODULES_FILE
-    
-	if [ -e $filename_modules ]; then
-		message "Adding modules [/home/root/modules]"
-		
-		sudo rm -rf $APP_BINARIES/home/root/modules
-		sudo mkdir -p $APP_BINARIES/home/root/modules
-		cd $APP_BINARIES/home/root/modules
-		sudo tar xvf $filename_modules .
-		sudo chown -R root:root $APP_BINARIES/*
-		tar czvf $OUTPUT/$APP_PKG -C $APP_BINARIES .
-	fi
-	
+	filename_modules=$KERNEL_BINARIES/$MODULES_FILE
 	#update kernel
 	cd $KERNEL_BINARIES
 	tar czvf $OUTPUT/$KERNEL_PKG zImage *.dtb
@@ -171,6 +159,17 @@ if [ $skiprootfs = 0 ]; then
 	    exit
 	fi
 fi
+
+message "Creating app package"
+if [ -e $filename_modules ]; then
+	sudo rm -rf $APP_BINARIES/home/root/modules
+	sudo mkdir -p $APP_BINARIES/home/root/modules
+	cd $APP_BINARIES/home/root/modules
+	sudo tar xvf $filename_modules .
+	sudo chown -R root:root $APP_BINARIES/*	
+fi
+cd $APP_BINARIES
+tar czvf $OUTPUT/$APP_PKG -C $APP_BINARIES .
 
 cd $HOME
 cp template-setup.sh $OUTPUT/setup.sh

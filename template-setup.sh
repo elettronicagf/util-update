@@ -57,7 +57,10 @@ fi
 
 dest_boot_partition=/run/media/$dest_dev'p1'
 dest_rootfs_partition=/run/media/$dest_dev'p2'
-dest_app_partition=/run/media/$dest_dev'p2'
+
+dest_boot_dev=$dest_dev'p1'
+dest_rootfs_dev=$dest_dev'p2'
+dest_app_dev=$dest_dev'p3'
 
 bootmedia=/run/media/mmcblk0p1
 [ ! -z "$(mount | grep sda)" ] && bootmedia=/run/media/sda
@@ -169,8 +172,11 @@ fi
 #--------------
 if [ -f $bootmedia/update3.bin ]; then
 	message "Installing application update -> $dest_app_partition"
-	mkdir -p $dest_app_partition
-	unzip -p -P $ZIP_PASSWORD $bootmedia/update3.bin | tar xzf - -C $dest_app_partition
+	#in futuro quanto mmcblk2p3 sarà montata in /home/root/
+	umount /dev/$dest_app_dev
+	mount /dev/$dest_app_dev "$dest_rootfs_partition"/home/root/		
+	unzip -p -P $ZIP_PASSWORD $bootmedia/update3.bin | tar xzf - -C $dest_rootfs_partition
+	umount /dev/$dest_app_dev
 fi
 
 cd /
