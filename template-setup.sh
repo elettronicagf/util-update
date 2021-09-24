@@ -1,10 +1,18 @@
 
 message() {
-	echo "##### $1 #####"
+	if [ $CONSOLE_DEV == "null" ]; then
+		echo "##### $1 #####" >> $bootmedia/updatelog.txt
+	else
+		echo "##### $1 #####"
+	fi
 }
 
 error() {
-	echo "##### Error: $1 #####"
+	if [ $CONSOLE_DEV == "null" ]; then
+		echo "##### Error: $1 #####" >> $bootmedia/updatelog.txt
+	else
+		echo "##### Error: $1 #####"
+	fi
 }
 
 installPackage() {
@@ -37,6 +45,8 @@ installPackage() {
 	tar xf $1 -C $2
 	rm $1
 }
+
+CONSOLE_DEV=$(cat /proc/cmdline | sed -e 's/^.*console=//' -e 's/,.*$//')
 
 #must match the one used in create-update.sh
 ZIP_PASSWORD="password"
@@ -135,6 +145,7 @@ if [ -f $source/uboot.tar.gz ]; then
 
 	#update u-boot
 	flash_unlock $mtd_uboot
+	flash_erase $mtd_uboot 0 0
 	[ -f ./uboot/u-boot.img ] && flashcp ./uboot/u-boot.img  $mtd_uboot
 	flash_lock $mtd_uboot
 	
@@ -142,6 +153,7 @@ if [ -f $source/uboot.tar.gz ]; then
 	if [ -f ./uboot/spl.img ]; then
 		echo Installing spl update...
 		flash_unlock $mtd_spl
+		flash_erase $mtd_spl 0 0
 		dd if=$mtd_spl of=spl-header.bin bs=1024 count=1
 		cp spl-header.bin mtdspl.bin
 		cat ./uboot/spl.img >> mtdspl.bin
