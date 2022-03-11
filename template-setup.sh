@@ -132,6 +132,7 @@ if [ -f $source/uboot.tar.gz ]; then
 
 	#update u-boot
 	flash_unlock $mtd_uboot
+	flash_erase $mtd_uboot 0 0
 	[ -f ./uboot/u-boot.img ] && flashcp ./uboot/u-boot.img  $mtd_uboot
 	flash_lock $mtd_uboot
 	
@@ -142,6 +143,7 @@ if [ -f $source/uboot.tar.gz ]; then
 		dd if=$mtd_spl of=spl-header.bin bs=1024 count=1
 		cp spl-header.bin mtdspl.bin
 		cat ./uboot/spl.img >> mtdspl.bin
+		flash_erase $mtd_spl 0 0
 		flashcp mtdspl.bin  $mtd_spl
 		flash_lock $mtd_spl
 	fi	
