@@ -145,9 +145,11 @@ if [ -f $source/uboot.tar.gz ]; then
 
 	#update u-boot
 	flash_unlock $mtd_uboot
+	flash_unlock $mtd_spl
+	
 	flash_erase $mtd_uboot 0 0
 	[ -f ./uboot/u-boot.img ] && flashcp ./uboot/u-boot.img  $mtd_uboot
-	flash_lock $mtd_uboot
+	
 	
 	#update spl
 	if [ -f ./uboot/spl.img ]; then
@@ -158,8 +160,10 @@ if [ -f $source/uboot.tar.gz ]; then
 		cp spl-header.bin mtdspl.bin
 		cat ./uboot/spl.img >> mtdspl.bin
 		flashcp mtdspl.bin  $mtd_spl
-		flash_lock $mtd_spl
 	fi	
+	
+	flash_lock $mtd_spl
+	flash_lock $mtd_uboot
 	
 	#ro nor
 	echo 0 > /sys/class/gpio/gpio90/value
